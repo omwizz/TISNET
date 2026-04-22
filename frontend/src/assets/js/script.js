@@ -14,6 +14,8 @@ const state = {
   selectedAdminClient: null,
   mobileNavActive: 'home',
   mobileNavSheetOpen: false,
+  lastScrollY: 0,
+  mobileHeaderVisible: true,
 };
 
 const dom = {};
@@ -358,12 +360,15 @@ async function init() {
   renderPricingCalculatorShell();
   renderTeamExperts();
   updateNavigation();
+  handleWindowResize();
+  handleWindowScroll();
 
   await Promise.all([loadPublicContent(), syncSession()]);
   updatePricingCalculator();
 }
 
 function cacheDom() {
+  dom.navbar = document.getElementById('navbar');
   dom.navVisitor = document.getElementById('nav-visitor');
   dom.navClient = document.getElementById('nav-client');
   dom.navAdmin = document.getElementById('nav-admin');
@@ -497,6 +502,7 @@ function bindStaticEvents() {
   window.addEventListener('message', handleCalendlyWindowMessage);
   window.addEventListener('resize', syncCalendlyEmbedLayout);
   window.addEventListener('resize', handleWindowResize);
+  window.addEventListener('scroll', handleWindowScroll, { passive: true });
 }
 
 async function api(path, options = {}) {
@@ -657,6 +663,57 @@ function handleWindowResize() {
   if (window.innerWidth > 1024 && state.mobileNavSheetOpen) {
     closeMobileNavSheet();
   }
+
+  if (window.innerWidth > 1024) {
+    state.mobileHeaderVisible = true;
+    dom.navbar?.classList.remove('mobile-navbar-hidden', 'mobile-navbar-scrolled');
+  }
+
+  handleWindowScroll();
+}
+
+function isMobileViewport() {
+  return window.innerWidth <= 1024;
+}
+
+function setMobileHeaderVisibility(visible) {
+  state.mobileHeaderVisible = visible;
+  if (!isMobileViewport()) {
+    dom.navbar?.classList.remove('mobile-navbar-hidden');
+    return;
+  }
+
+  dom.navbar?.classList.toggle('mobile-navbar-hidden', !visible);
+}
+
+function handleWindowScroll() {
+  const currentY = Math.max(window.scrollY || 0, 0);
+  state.lastScrollY = Number.isFinite(state.lastScrollY) ? state.lastScrollY : currentY;
+
+  if (!isMobileViewport()) {
+    state.mobileHeaderVisible = true;
+    dom.navbar?.classList.remove('mobile-navbar-hidden', 'mobile-navbar-scrolled');
+    state.lastScrollY = currentY;
+    return;
+  }
+
+  dom.navbar?.classList.toggle('mobile-navbar-scrolled', currentY > 12);
+
+  if (state.mobileNavSheetOpen || currentY < 18) {
+    setMobileHeaderVisibility(true);
+    state.lastScrollY = currentY;
+    return;
+  }
+
+  const delta = currentY - state.lastScrollY;
+
+  if (delta > 8 && currentY > 120) {
+    setMobileHeaderVisibility(false);
+  } else if (delta < -8) {
+    setMobileHeaderVisibility(true);
+  }
+
+  state.lastScrollY = currentY;
 }
 
 function getActiveViewId() {
@@ -907,11 +964,15 @@ function closeMobileNavSheet(event) {
   }
 
   state.mobileNavSheetOpen = false;
+  setMobileHeaderVisibility(true);
   renderMobileNavigation();
 }
 
 function toggleMobileNavSheet() {
   state.mobileNavSheetOpen = !state.mobileNavSheetOpen;
+  if (state.mobileNavSheetOpen) {
+    setMobileHeaderVisibility(true);
+  }
   renderMobileNavigation();
 }
 
