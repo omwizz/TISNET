@@ -101,7 +101,7 @@ Si no existe:
 Ejemplo base para local:
 
 ```env
-FLASK_SECRET_KEY=change-this-secret
+FLASK_SECRET_KEY=define-una-secret-key-larga-y-unica
 FLASK_HOST=127.0.0.1
 FLASK_PORT=5000
 FLASK_DEBUG=false
@@ -109,14 +109,14 @@ ENABLE_DEMO_LOGIN=false
 
 OWNER_ADMIN_NAME=Administrador Principal TISNET
 OWNER_ADMIN_EMAIL=admin@tisnet.pe
-OWNER_ADMIN_PASSWORD=TisnetPanel2026!
+OWNER_ADMIN_PASSWORD=define-una-clave-admin-segura
 OWNER_ADMIN_COMPANY=TISNET
 OWNER_ADMIN_WEBSITE=https://tisnet.pe
 OWNER_ADMIN_PHONE=+51999999999
 
 OWNER_SALES_NAME=Ejecutivo Comercial TISNET
 OWNER_SALES_EMAIL=ventas@tisnet.pe
-OWNER_SALES_PASSWORD=VentasTisnet2026!
+OWNER_SALES_PASSWORD=define-una-clave-ventas-segura
 OWNER_SALES_COMPANY=TISNET
 OWNER_SALES_WEBSITE=https://tisnet.pe
 OWNER_SALES_PHONE=+51999999999
@@ -141,7 +141,7 @@ SMTP_PORT=587
 SMTP_USERNAME=
 SMTP_PASSWORD=
 SMTP_USE_TLS=true
-SMTP_FROM_EMAIL=hola@tisnet.pe
+SMTP_FROM_EMAIL=tu-correo@tu-dominio.com
 SMTP_FROM_NAME=TISNET
 ```
 
@@ -178,14 +178,14 @@ Administrador:
 
 ```text
 Email: admin@tisnet.pe
-Password: TisnetPanel2026!
+Password: la clave configurada en tu archivo .env
 ```
 
 Ventas:
 
 ```text
 Email: ventas@tisnet.pe
-Password: VentasTisnet2026!
+Password: la clave configurada en tu archivo .env
 ```
 
 Nota:
@@ -267,6 +267,11 @@ Debes poner valores reales para:
 - `SMTP_USERNAME`
 - `SMTP_PASSWORD`
 - `SMTP_FROM_EMAIL`
+
+Importante:
+
+- el dominio propio solo podra activarse cuando el dominio exista y sus DNS apunten a Render
+- el envio de correos por SMTP requiere credenciales reales de tu proveedor de correo
 
 ### Variables que Render conectara automaticamente
 

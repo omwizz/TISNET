@@ -94,10 +94,10 @@ DEFAULT_CLIENT_CLOSE_CALENDLY = (
 )
 CALENDLY_PERSONAL_ACCESS_TOKEN = os.getenv("CALENDLY_PERSONAL_ACCESS_TOKEN", "").strip()
 DEFAULT_OWNER_ADMIN_EMAIL = "admin@tisnet.pe"
-DEFAULT_OWNER_ADMIN_PASSWORD = "TisnetPanel2026!"
+DEFAULT_OWNER_ADMIN_PASSWORD = "define-una-clave-admin-segura"
 DEFAULT_OWNER_SALES_EMAIL = "ventas@tisnet.pe"
-DEFAULT_OWNER_SALES_PASSWORD = "VentasTisnet2026!"
-DEFAULT_AUTO_CLIENT_PASSWORD = "ClienteTisnet2026!"
+DEFAULT_OWNER_SALES_PASSWORD = "define-una-clave-ventas-segura"
+DEFAULT_AUTO_CLIENT_PASSWORD = "define-una-clave-cliente-segura"
 SERVICE_LABELS = {
     "web": "Página web",
     "ecommerce": "E-commerce",
@@ -2907,7 +2907,7 @@ def image_file(filename):
 
 @app.route("/favicon.ico")
 def favicon():
-    return send_from_directory(FRONTEND_ASSETS_DIR / "img", "wstapicon.png")
+    return send_from_directory(FRONTEND_ASSETS_DIR / "img", "favicon.ico")
 
 
 @app.route("/api/system/health")
