@@ -395,6 +395,12 @@ function cacheDom() {
   dom.footerEmailLink = document.getElementById('footer-email-link');
   dom.heroPrimaryCta = document.getElementById('hero-primary-cta');
   dom.ctaPrimaryCta = document.getElementById('cta-primary-cta');
+  dom.footerMeetingLink = document.querySelector('.footer-col a.footer-link[href="#newsletter-section"]');
+  dom.caseModalMeetingCta = document.querySelector('.case-modal .action-row .btn.btn-accent');
+  dom.newsletterWebsiteLabel = document.querySelector('label[for="newsletter-website"]');
+  dom.newsletterWebsiteInput = document.getElementById('newsletter-website');
+  dom.registerWebsiteLabel = document.querySelector('label[for="register-website"]');
+  dom.registerWebsiteInput = document.getElementById('register-website');
 
   dom.newsletterForm = document.getElementById('newsletter-form');
   dom.newsletterFeedback = document.getElementById('newsletter-feedback');
@@ -1093,6 +1099,11 @@ function renderPublicContent() {
   }
 
   const { settings, portfolio, clients } = state.publicContent;
+  const configuredHeroCta = (settings.hero_cta_label || '').trim();
+  const publicMeetingCta =
+    configuredHeroCta && !configuredHeroCta.toLowerCase().includes('diagn')
+      ? configuredHeroCta
+      : 'Solicita tu reunion';
 
   if (dom.footerTagline) {
     dom.footerTagline.textContent = settings.footer_tagline || dom.footerTagline.textContent;
@@ -1104,11 +1115,37 @@ function renderPublicContent() {
   }
 
   if (dom.heroPrimaryCta) {
-    dom.heroPrimaryCta.textContent = settings.hero_cta_label || dom.heroPrimaryCta.textContent;
+    dom.heroPrimaryCta.textContent = publicMeetingCta;
   }
 
   if (dom.ctaPrimaryCta) {
-    dom.ctaPrimaryCta.textContent = settings.hero_cta_label || dom.ctaPrimaryCta.textContent;
+    dom.ctaPrimaryCta.textContent = publicMeetingCta;
+  }
+
+  if (dom.footerMeetingLink) {
+    dom.footerMeetingLink.textContent = 'Solicitar reunion';
+  }
+
+  if (dom.caseModalMeetingCta) {
+    dom.caseModalMeetingCta.textContent = 'Agendar reunion';
+  }
+
+  if (dom.newsletterWebsiteLabel) {
+    dom.newsletterWebsiteLabel.textContent = 'Red social (opcional)';
+  }
+
+  if (dom.newsletterWebsiteInput) {
+    dom.newsletterWebsiteInput.type = 'text';
+    dom.newsletterWebsiteInput.placeholder = '@tu_marca o https://tiktok.com/@tu_marca';
+  }
+
+  if (dom.registerWebsiteLabel) {
+    dom.registerWebsiteLabel.textContent = 'Red social (opcional)';
+  }
+
+  if (dom.registerWebsiteInput) {
+    dom.registerWebsiteInput.type = 'text';
+    dom.registerWebsiteInput.placeholder = '@tuempresa o https://instagram.com/tuempresa';
   }
 
   if (dom.portfolioTrack) {
@@ -1362,6 +1399,7 @@ function renderClientDashboard() {
   const data = state.clientDashboard;
   const project = data.project;
   const metrics = data.metrics;
+  const editableProfilePhone = extractLocalPhone(data.profile.phone);
 
   dom.clientTabs.overview.innerHTML = `
     <div class="panel-header">
@@ -1465,24 +1503,39 @@ function renderClientDashboard() {
           <input class="form-input" id="client-settings-company" name="company" type="text" value="${escapeAttribute(data.profile.company || '')}">
         </div>
         <div class="form-group">
-          <label class="form-label" for="client-settings-website">Página web</label>
-          <input class="form-input" id="client-settings-website" name="website" type="url" value="${escapeAttribute(data.profile.website || '')}">
+          <label class="form-label" for="client-settings-website">Red social (opcional)</label>
+          <input class="form-input" id="client-settings-website" name="website" type="text" placeholder="@tu_marca o https://tiktok.com/@tu_marca" value="${escapeAttribute(data.profile.website || '')}">
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label" for="client-settings-phone">Teléfono</label>
-        <input class="form-input" id="client-settings-phone" name="phone" type="text" value="${escapeAttribute(data.profile.phone || '')}">
+        <label class="form-label" for="client-settings-phone">Telefono (obligatorio)</label>
+        <input class="form-input" id="client-settings-phone" name="phone" type="text" inputmode="numeric" maxlength="9" pattern="[0-9]{9}" placeholder="987654321" value="${escapeAttribute(editableProfilePhone)}" required>
       </div>
       <div class="action-row">
         <button class="btn btn-primary" type="submit">Guardar cambios</button>
       </div>
-      <p class="inline-note" id="client-settings-feedback">Tu panel se actualiza con esta información.</p>
+      <p class="inline-note" id="client-settings-feedback">Tu panel se actualiza con esta informacion. El telefono debe tener 9 digitos.</p>
     </form>
   `;
 
+  const clientSettingsWebsiteLabel = dom.clientTabs.settings.querySelector('label[for="client-settings-website"]');
+  if (clientSettingsWebsiteLabel) {
+    clientSettingsWebsiteLabel.textContent = 'Red social (opcional)';
+  }
+
+  const clientSettingsPhoneLabel = dom.clientTabs.settings.querySelector('label[for="client-settings-phone"]');
+  if (clientSettingsPhoneLabel) {
+    clientSettingsPhoneLabel.textContent = 'Telefono (obligatorio)';
+  }
+
+  const clientSettingsFeedback = dom.clientTabs.settings.querySelector('#client-settings-feedback');
+  if (clientSettingsFeedback) {
+    clientSettingsFeedback.textContent = 'Tu panel se actualiza con esta informacion. El telefono debe tener 9 digitos.';
+  }
+
   dom.clientTabs.wizard.innerHTML = `
     <div class="panel-header">
-      <h2 class="panel-title">Diagnóstico Inteligente</h2>
+      <h2 class="panel-title">Diagnostico</h2>
       <p class="panel-sub">Completa o actualiza el formulario para alimentar el backend del proyecto.</p>
     </div>
     <div class="split-grid">
@@ -1518,6 +1571,11 @@ function renderClientDashboard() {
       </div>
     </div>
   `;
+
+  const clientWizardTitle = dom.clientTabs.wizard.querySelector('.panel-title');
+  if (clientWizardTitle) {
+    clientWizardTitle.textContent = 'Diagnostico';
+  }
 }
 
 function renderAdminOverview() {
@@ -2280,7 +2338,7 @@ function renderClientsOverview(clients) {
               <div class="client-overview-actions">
                 <button class="btn btn-primary" type="button" onclick="openAdminClientDetail(${client.id})">Ver detalle</button>
                 <button class="btn btn-ghost" type="button" onclick="window.open('mailto:${escapeAttribute(client.email)}', '_blank')">Email</button>
-                ${client.website ? `<button class="btn btn-ghost" type="button" onclick="window.open('${escapeAttribute(client.website)}', '_blank')">Web</button>` : ''}
+                ${client.website ? `<button class="btn btn-ghost" type="button" onclick="window.open('${escapeAttribute(client.website)}', '_blank')">Red social</button>` : ''}
               </div>
             </article>
           `
@@ -2352,7 +2410,7 @@ function renderLeadCard(lead) {
       <div class="kc-actions">
         ${canConvert ? `<button class="btn btn-primary" type="button" onclick="convertLeadToProject(${lead.id})">Convertir</button>` : ''}
         <button class="btn btn-ghost" type="button" onclick="window.open('${escapeAttribute(mailto)}', '_blank')">Email</button>
-        ${lead.website ? `<button class="btn btn-ghost" type="button" onclick="window.open('${escapeAttribute(lead.website)}', '_blank')">Web</button>` : ''}
+            ${lead.website ? `<button class="btn btn-ghost" type="button" onclick="window.open('${escapeAttribute(lead.website)}', '_blank')">Red social</button>` : ''}
       </div>
       <div class="kc-footer">
         <span class="kc-date">${formatDate(lead.created_at)} Â· ${timeAgo(lead.created_at)}</span>
@@ -2417,7 +2475,7 @@ function renderTaskOpsSummary(taskMetrics) {
         <div class="insight-head">
           <div>
             <h3>Resumen operativo</h3>
-            <p>Tareas activas, cerradas y avance general del equipo.</p>
+            <p>Tareas en proceso, cerradas y avance general del equipo.</p>
           </div>
           <span class="insight-badge">HU11 / HU13</span>
         </div>
@@ -2602,7 +2660,7 @@ function renderTeamPerformanceList(taskMetrics) {
                   <strong>${member.completed_tasks || 0}</strong>
                 </div>
                 <div class="admin-task-metric-card">
-                  <span>Activas</span>
+                  <span>Proceso</span>
                   <strong>${member.active_tasks || 0}</strong>
                 </div>
                 <div class="admin-task-metric-card">
@@ -2858,7 +2916,7 @@ function renderAdminClientDetailModal(detail) {
         <div class="admin-client-hero-actions">
           <span class="badge ${lead ? badgeClassForLead(lead.status) : 'badge-active'}">${escapeHtml(leadState)}</span>
           <button class="btn btn-ghost" type="button" onclick="window.open('mailto:${escapeAttribute(client.email || '')}', '_blank')">Email</button>
-          ${client.website ? `<button class="btn btn-ghost" type="button" onclick="window.open('${escapeAttribute(client.website)}', '_blank')">Web</button>` : ''}
+          ${client.website ? `<button class="btn btn-ghost" type="button" onclick="window.open('${escapeAttribute(client.website)}', '_blank')">Red social</button>` : ''}
         </div>
       </section>
 
@@ -2890,7 +2948,7 @@ function renderAdminClientDetailModal(detail) {
             { label: 'Nombre', value: client.full_name || 'Sin nombre' },
             { label: 'Empresa', value: client.company || 'Sin empresa' },
             { label: 'Email', value: client.email || 'Sin correo' },
-            { label: 'Web', value: client.website || 'No registrada' },
+            { label: 'Red social', value: client.website || 'No registrada' },
             { label: 'Teléfono', value: client.phone || 'No registrado' },
             { label: 'Creado', value: client.created_at ? formatDate(client.created_at) : 'Sin fecha' },
           ])}
@@ -2911,7 +2969,7 @@ function renderAdminClientDetailModal(detail) {
                 ${renderAdminClientInfoRows([
                   { label: 'Servicio solicitado', value: serviceLabel(lead.service_type) },
                   { label: 'Empresa del lead', value: lead.company || client.company || 'Sin empresa' },
-                  { label: 'Web declarada', value: lead.website || client.website || 'No registrada' },
+                  { label: 'Red social declarada', value: lead.website || client.website || 'No registrada' },
                   { label: 'Enviado', value: lead.created_at ? formatDateTime(lead.created_at) : 'Sin fecha' },
                 ])}
               `
@@ -3364,15 +3422,15 @@ async function handleDiagnosticSubmit(event) {
     goal: document.getElementById('diagnostic-goal').value.trim(),
   };
 
-  setFeedback(dom.diagnosticFeedback, 'Guardando diagnóstico...', 'pending');
+  setFeedback(dom.diagnosticFeedback, 'Guardando diagnostico...', 'pending');
 
   try {
     await api('/api/client/diagnostic', {
       method: 'POST',
       body: payload,
     });
-    setFeedback(dom.diagnosticFeedback, 'Diagnóstico guardado correctamente.', 'success');
-    toast('Diagnóstico actualizado.', 'success');
+    setFeedback(dom.diagnosticFeedback, 'Diagnostico guardado. En 24 horas habra una respuesta de desarrollo.', 'success');
+    toast('Diagnostico actualizado. Te responderemos en 24 horas.', 'success');
     await loadClientDashboard();
   } catch (error) {
     setFeedback(dom.diagnosticFeedback, error.message, 'error');
@@ -3386,8 +3444,13 @@ async function handleDynamicSubmit(event) {
   if (form.id === 'client-settings-form') {
     event.preventDefault();
     const payload = Object.fromEntries(new FormData(form).entries());
+    const feedbackNode = document.getElementById('client-settings-feedback');
 
     try {
+      payload.phone = normalizeLocalPhone(payload.phone);
+      if (form.querySelector('#client-settings-phone')) {
+        form.querySelector('#client-settings-phone').value = payload.phone;
+      }
       const response = await api('/api/client/profile', {
         method: 'PUT',
         body: payload,
@@ -3395,10 +3458,10 @@ async function handleDynamicSubmit(event) {
       state.session = response.profile;
       updateNavigation();
       await loadClientDashboard();
-      setFeedback(document.getElementById('client-settings-feedback'), 'Perfil actualizado.', 'success');
+      setFeedback(feedbackNode, 'Perfil actualizado.', 'success');
       toast('Perfil actualizado.', 'success');
     } catch (error) {
-      setFeedback(document.getElementById('client-settings-feedback'), error.message, 'error');
+      setFeedback(feedbackNode, error.message, 'error');
       toast(error.message, 'error');
     }
   }
@@ -3767,9 +3830,9 @@ function resolveScheduleContext(context) {
     public: {
       key: 'public',
       label: 'Calendly Público',
-      title: 'Agenda tu diagnóstico',
-      description: 'Reserva una llamada inicial sin salir del sitio.',
-      meetingType: 'Diagnóstico inicial',
+      title: 'Agenda tu reunion',
+      description: 'Reserva una reunion inicial sin salir del sitio.',
+      meetingType: 'Reunion inicial',
       url: settings.public_calendly_url,
     },
     'client-review': {
@@ -4426,6 +4489,21 @@ function prefillService(serviceType) {
 
 function scrollToNewsletter() {
   showPublicSection('newsletter-section');
+}
+
+function extractLocalPhone(value) {
+  return String(value || '').replace(/\D/g, '').slice(-9);
+}
+
+function normalizeLocalPhone(value) {
+  const digits = extractLocalPhone(value);
+  if (!digits) {
+    throw new Error('Ingresa un telefono de 9 digitos.');
+  }
+  if (digits.length !== 9) {
+    throw new Error('El telefono debe tener 9 digitos.');
+  }
+  return digits;
 }
 
 function selectDiagnosticStage(button) {

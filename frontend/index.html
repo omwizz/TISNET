@@ -17,6 +17,7 @@
       <button class="nav-logo nav-logo-btn" type="button" onclick="showView('public-view')">TISNET</button>
 
       <div class="nav-links" id="nav-visitor">
+        <button class="nav-link" type="button" onclick="showView('public-view')">Inicio</button>
         <button class="nav-link" type="button" onclick="showPublicSection('servicios')">Servicios</button>
         <button class="nav-link" type="button" onclick="showPublicSection('portafolio')">Portafolio</button>
         <button class="nav-link" type="button" onclick="showPublicSection('newsletter-section')">Contacto</button>
@@ -88,7 +89,7 @@
         </div>
         <div class="hero-actions">
           <button class="btn btn-accent" id="hero-primary-cta" type="button" onclick="openScheduleModal('public')">
-            Solicita tu diagnóstico
+            Solicita tu reunion
           </button>
           <button class="btn btn-outline" type="button" onclick="showPublicSection('portafolio')">Ver portafolio</button>
           <button class="btn btn-outline" type="button" onclick="openPricingCalculator()">Calcular presupuesto</button>
@@ -294,8 +295,8 @@
                 <input class="form-input" id="newsletter-company" name="company" type="text" placeholder="Nombre de tu empresa">
               </div>
               <div class="form-group">
-                <label class="form-label" for="newsletter-website">Página web</label>
-                <input class="form-input" id="newsletter-website" name="website" type="url" placeholder="https://tuweb.com">
+                <label class="form-label" for="newsletter-website">Red social (opcional)</label>
+                <input class="form-input" id="newsletter-website" name="website" type="text" placeholder="@tu_marca o https://tiktok.com/@tu_marca">
               </div>
             </div>
 
@@ -368,7 +369,7 @@
           </div>
           <div class="footer-col">
             <h5>Contacto</h5>
-            <a href="#newsletter-section" class="footer-link">Solicitar diagnóstico</a>
+            <a href="#newsletter-section" class="footer-link">Solicitar reunion</a>
             <a href="mailto:hola@tisnet.pe" class="footer-link" id="footer-email-link">hola@tisnet.pe</a>
             <button class="footer-link footer-link-button" type="button" onclick="openWA()">WhatsApp</button>
           </div>
@@ -821,8 +822,8 @@
           <input type="text" class="form-input" id="register-company" placeholder="Nombre de tu empresa">
         </div>
         <div class="form-group">
-          <label class="form-label" for="register-website">Página web</label>
-          <input type="url" class="form-input" id="register-website" placeholder="https://tuempresa.com">
+          <label class="form-label" for="register-website">Red social (opcional)</label>
+          <input type="text" class="form-input" id="register-website" placeholder="@tuempresa o https://instagram.com/tuempresa">
         </div>
         <div class="form-group">
           <label class="form-label" for="register-password">Contraseña</label>
@@ -847,7 +848,7 @@
       <p class="panel-sub" id="case-modal-description"></p>
       <div class="case-highlights" id="case-modal-highlights"></div>
       <div class="action-row">
-        <button class="btn btn-accent" type="button" onclick="openScheduleModal('public')">Agendar diagnóstico</button>
+        <button class="btn btn-accent" type="button" onclick="openScheduleModal('public')">Agendar reunion</button>
         <button class="btn btn-outline" type="button" onclick="scrollToNewsletter()">Solicitar algo similar</button>
       </div>
     </div>

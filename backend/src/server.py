@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import smtplib
 from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta
@@ -370,7 +371,7 @@ def ensure_site_settings(connection):
             DEFAULT_CALENDLY,
             DEFAULT_CLIENT_REVIEW_CALENDLY,
             DEFAULT_CLIENT_CLOSE_CALENDLY,
-            "Solicita tu diagnóstico",
+            "Solicita tu reunion",
             "Agencia integral de tecnología y creatividad. Transformamos ideas en sistemas digitales escalables.",
         ),
     )
@@ -1229,6 +1230,15 @@ def require_auth(required_role=None):
 def validate_email(value):
     if not value or "@" not in value:
         raise ValueError("Ingresa un correo válido.")
+
+
+def normalize_client_phone(value):
+    digits = re.sub(r"\D", "", value or "")
+    if not digits:
+        raise ValueError("Ingresa un telefono de 9 digitos.")
+    if len(digits) != 9:
+        raise ValueError("El telefono debe tener 9 digitos.")
+    return digits
 
 
 def latest_lead_for_email(email):
@@ -3138,8 +3148,8 @@ def update_client_profile(user):
     full_name = (data.get("full_name") or "").strip()
     email = (data.get("email") or "").strip().lower()
     company = (data.get("company") or "").strip()
-    website = (data.get("website") or "").strip()
-    phone = (data.get("phone") or "").strip()
+    website = (data.get("website") or data.get("social_profile") or "").strip()
+    phone = normalize_client_phone(data.get("phone"))
 
     if not full_name:
         return api_response(False, "Ingresa tu nombre completo."), 400
