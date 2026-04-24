@@ -467,6 +467,14 @@
     max-width: 760px;
   }
 
+  .home-project-grid {
+    margin-bottom: 28px;
+  }
+
+  .home-projects-cta {
+    margin-top: 0;
+  }
+
   .landing-preview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

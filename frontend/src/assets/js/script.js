@@ -389,6 +389,7 @@ function cacheDom() {
 
   dom.portfolioTrack = document.getElementById('portfolio-track');
   dom.portfolioProgress = document.getElementById('portfolio-progress');
+  dom.homeProjectGrid = document.getElementById('home-project-grid');
   dom.clientLogos = document.getElementById('client-logos');
   dom.teamExpertsGrid = document.getElementById('team-experts-grid');
   dom.footerTagline = document.getElementById('footer-tagline');
@@ -1172,6 +1173,24 @@ function renderPublicContent() {
               <button class="btn btn-ghost" type="button" onclick="openWA('Hola TISNET, quiero cotizar un proyecto parecido a ${escapeAttribute(item.title)}.')">WhatsApp</button>
             </div>
           </article>
+        `
+      )
+      .join('');
+  }
+
+  if (dom.homeProjectGrid) {
+    dom.homeProjectGrid.innerHTML = portfolio
+      .slice(0, 3)
+      .map(
+        (item) => `
+          <button class="portfolio-card portfolio-card-button" type="button" onclick="openCaseModal('${escapeAttribute(item.slug)}')">
+            <div class="portfolio-bg">${escapeHtml(item.icon || '•')}</div>
+            <div class="portfolio-overlay">
+              <span class="portfolio-label">${escapeHtml(item.category)}</span>
+              <span class="portfolio-name">${escapeHtml(item.title)}</span>
+              <span class="portfolio-summary">${escapeHtml(item.short_description || 'Proyecto digital desarrollado por TISNET.')}</span>
+            </div>
+          </button>
         `
       )
       .join('');
