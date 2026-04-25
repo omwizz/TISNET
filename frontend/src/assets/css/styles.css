@@ -1411,8 +1411,7 @@
     color: var(--primary);
   }
 
-  .auth-submit-btn,
-  .auth-google-btn {
+  .auth-submit-btn {
     width: 100%;
     min-height: 52px;
     border-radius: 15px;
@@ -1429,55 +1428,8 @@
     box-shadow: 0 16px 34px rgba(0, 143, 255, .28);
   }
 
-  .auth-submit-btn:hover,
-  .auth-google-btn:hover {
+  .auth-submit-btn:hover {
     transform: translateY(-2px);
-  }
-
-  .auth-google-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    border: 1px solid rgba(255, 255, 255, .12);
-    background: rgba(255, 255, 255, .96);
-    color: #111827;
-  }
-
-  .auth-google-btn:hover {
-    border-color: rgba(0, 212, 255, .5);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, .2);
-  }
-
-  .auth-google-btn svg {
-    width: 21px;
-    height: 21px;
-    flex: 0 0 21px;
-  }
-
-  .auth-divider {
-    position: relative;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: .78rem;
-    margin: 2px 0;
-  }
-
-  .auth-divider::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 1px;
-    background: rgba(255, 255, 255, .08);
-  }
-
-  .auth-divider span {
-    position: relative;
-    display: inline-block;
-    padding: 0 12px;
-    background: #111621;
   }
 
   .auth-switch-copy {
@@ -4631,7 +4583,6 @@
     }
 
     .auth-submit-btn,
-    .auth-google-btn,
     .auth-input-shell,
     .form-input.auth-soft-input {
       min-height: 50px;
@@ -4840,6 +4791,10 @@
   background: rgba(18,20,28,.9);
   overflow: hidden;
   transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.auth-phone-shell {
+  min-height: 52px;
 }
 
 .phone-input-shell:focus-within {

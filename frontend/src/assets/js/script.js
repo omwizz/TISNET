@@ -364,7 +364,6 @@ async function init() {
   handleWindowScroll();
 
   await Promise.all([loadPublicContent(), syncSession()]);
-  handleAuthRedirectNotice();
   applySessionDefaults();
   updatePricingCalculator();
 }
@@ -404,6 +403,7 @@ function cacheDom() {
   dom.newsletterWebsiteLabel = document.querySelector('label[for="newsletter-website"]');
   dom.newsletterWebsiteInput = document.getElementById('newsletter-website');
   dom.newsletterPhone = document.getElementById('newsletter-phone');
+  dom.registerPhone = document.getElementById('register-phone');
   dom.registerWebsiteLabel = document.querySelector('label[for="register-website"]');
   dom.registerWebsiteInput = document.getElementById('register-website');
 
@@ -510,6 +510,7 @@ function bindStaticEvents() {
   dom.portfolioTrack?.addEventListener('mouseenter', stopPortfolioAutoplay);
   dom.portfolioTrack?.addEventListener('mouseleave', startPortfolioAutoplay);
   dom.newsletterPhone?.addEventListener('input', handlePhoneInput);
+  dom.registerPhone?.addEventListener('input', handlePhoneInput);
 
   document.addEventListener('submit', handleDynamicSubmit);
   document.addEventListener('keydown', handleGlobalKeydown);
@@ -3750,9 +3751,21 @@ async function handleLoginSubmit(event) {
 async function handleRegisterSubmit(event) {
   event.preventDefault();
 
+  let phone = '';
+  try {
+    phone = normalizeLocalPhone(dom.registerPhone?.value || '');
+    if (dom.registerPhone) {
+      dom.registerPhone.value = phone;
+    }
+  } catch (error) {
+    toast(error.message, 'error');
+    return;
+  }
+
   const payload = {
     full_name: document.getElementById('register-name').value.trim(),
     email: document.getElementById('register-email').value.trim(),
+    phone,
     company: document.getElementById('register-company').value.trim(),
     website: document.getElementById('register-website').value.trim(),
     password: document.getElementById('register-password').value.trim(),
@@ -4086,38 +4099,6 @@ function togglePasswordVisibility(inputId, button) {
   input.type = shouldShow ? 'text' : 'password';
   button?.classList.toggle('is-visible', shouldShow);
   button?.setAttribute('aria-label', shouldShow ? 'Ocultar contrasena' : 'Mostrar contrasena');
-}
-
-function handleGoogleLogin() {
-  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}` || '/';
-  window.location.href = `/api/auth/google/start?next=${encodeURIComponent(currentPath)}`;
-}
-
-function handleAuthRedirectNotice() {
-  const url = new URL(window.location.href);
-  const authStatus = url.searchParams.get('auth');
-  if (!authStatus) {
-    return;
-  }
-
-  url.searchParams.delete('auth');
-  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
-
-  if (authStatus === 'google-success') {
-    toast('Sesion iniciada con Google.', 'success');
-    if (state.session?.role === 'client') {
-      showView('client-panel-view');
-    }
-    return;
-  }
-
-  const messages = {
-    'google-unconfigured': 'Google todavia no esta configurado. Agrega GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en Render.',
-    'google-cancelled': 'Inicio con Google cancelado.',
-    'google-state': 'No pudimos validar la sesion de Google. Intentalo otra vez.',
-    'google-error': 'Google no pudo iniciar sesion en este momento.',
-  };
-  toast(messages[authStatus] || 'No pudimos completar el acceso con Google.', 'error');
 }
 
 function openCaseModal(slug) {
@@ -5233,7 +5214,6 @@ window.openModal = openModal;
 window.switchTab = switchTab;
 window.closeModalBg = closeModalBg;
 window.togglePasswordVisibility = togglePasswordVisibility;
-window.handleGoogleLogin = handleGoogleLogin;
 window.logout = logout;
 window.openPricingCalculator = openPricingCalculator;
 window.showPublicSection = showPublicSection;
