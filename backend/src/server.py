@@ -1244,7 +1244,7 @@ def normalize_client_phone(value):
 def latest_lead_for_email(email):
     return fetch_one(
         """
-        SELECT id, full_name, email, company, website, service_type, message, source, status, created_at
+        SELECT id, full_name, email, company, website, phone, service_type, message, source, status, created_at
         FROM leads
         WHERE email = %s
         ORDER BY created_at DESC
@@ -1359,6 +1359,7 @@ def notify_new_lead(lead):
         <p><strong>Nombre:</strong> {lead['full_name']}</p>
         <p><strong>Email:</strong> {lead['email']}</p>
         <p><strong>Empresa:</strong> {lead.get('company') or 'Sin empresa'}</p>
+        <p><strong>Telefono:</strong> {f"+51 {lead.get('phone')}" if lead.get('phone') else 'Sin telefono'}</p>
         <p><strong>Servicio:</strong> {service_label(lead['service_type'])}</p>
         <p><strong>Mensaje:</strong><br>{lead.get('message') or 'Sin mensaje'}</p>
     """
@@ -1386,30 +1387,36 @@ def notify_new_lead(lead):
     )
 
 
-def create_lead(data, source="website", status="new"):
+def create_lead(data, source="website", status="new", require_phone=False):
     full_name = (data.get("full_name") or data.get("nombre") or "").strip()
     email = (data.get("email") or "").strip().lower()
     company = (data.get("company") or data.get("empresa") or "").strip()
     website = (data.get("website") or data.get("pagina_web") or "").strip()
+    phone_raw = (data.get("phone") or data.get("telefono") or "").strip()
     service_type = (data.get("service_type") or data.get("servicio") or "diagnostic").strip()
     message = (data.get("message") or data.get("mensaje") or "").strip()
+    phone = ""
 
     if not full_name:
         raise ValueError("Ingresa tu nombre.")
     validate_email(email)
     if not service_type:
         raise ValueError("Selecciona un servicio.")
+    if phone_raw:
+        phone = normalize_client_phone(phone_raw)
+    elif require_phone:
+        raise ValueError("Ingresa un telefono de 9 digitos.")
 
     lead_id = execute_write(
         """
-        INSERT INTO leads (full_name, email, company, website, service_type, message, source, status)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO leads (full_name, email, company, website, phone, service_type, message, source, status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (full_name, email, company, website, service_type, message, source, status),
+        (full_name, email, company, website, phone, service_type, message, source, status),
     )
     lead = fetch_one(
         """
-        SELECT id, full_name, email, company, website, service_type, message, source, status, created_at
+        SELECT id, full_name, email, company, website, phone, service_type, message, source, status, created_at
         FROM leads
         WHERE id = %s
         """,
@@ -1645,13 +1652,15 @@ def ensure_client_user_from_lead(lead):
             SET
                 full_name = CASE WHEN full_name IS NULL OR full_name = '' THEN %s ELSE full_name END,
                 company = CASE WHEN company IS NULL OR company = '' THEN %s ELSE company END,
-                website = CASE WHEN website IS NULL OR website = '' THEN %s ELSE website END
+                website = CASE WHEN website IS NULL OR website = '' THEN %s ELSE website END,
+                phone = CASE WHEN phone IS NULL OR phone = '' THEN %s ELSE phone END
             WHERE id = %s
             """,
             (
                 (lead.get("full_name") or "Cliente TISNET").strip(),
                 (lead.get("company") or "").strip(),
                 (lead.get("website") or "").strip(),
+                (lead.get("phone") or "").strip(),
                 existing_user["id"],
             ),
         )
@@ -1673,7 +1682,7 @@ def ensure_client_user_from_lead(lead):
             generate_password_hash(DEFAULT_AUTO_CLIENT_PASSWORD),
             (lead.get("company") or "").strip(),
             (lead.get("website") or "").strip(),
-            "",
+            (lead.get("phone") or "").strip(),
         ),
     )
     return get_user_by_id(user_id), True
@@ -2109,7 +2118,7 @@ def admin_client_detail_payload(client_id):
 
     leads = fetch_all(
         """
-        SELECT id, full_name, email, company, website, service_type, message, source, status, created_at, updated_at
+        SELECT id, full_name, email, company, website, phone, service_type, message, source, status, created_at, updated_at
         FROM leads
         WHERE email = %s
         ORDER BY created_at DESC
@@ -2466,7 +2475,7 @@ def admin_overview_payload():
 
     recent_leads = fetch_all(
         """
-        SELECT id, full_name, email, company, service_type, status, created_at
+        SELECT id, full_name, email, company, phone, service_type, status, created_at
         FROM leads
         ORDER BY created_at DESC
         LIMIT 5
@@ -2474,15 +2483,16 @@ def admin_overview_payload():
     )
     leads = fetch_all(
         """
-        SELECT
-            leads.id,
-            leads.full_name,
-            leads.email,
-            leads.company,
-            leads.website,
-            leads.service_type,
-            leads.message,
-            leads.source,
+          SELECT
+              leads.id,
+              leads.full_name,
+              leads.email,
+              leads.company,
+              leads.website,
+              leads.phone,
+              leads.service_type,
+              leads.message,
+              leads.source,
             leads.status,
             leads.created_at,
             leads.updated_at,
@@ -2994,7 +3004,7 @@ def public_quote_pdf():
 def public_contact():
     require_database()
     data = request.get_json(force=True) or {}
-    lead = create_lead(data, source="newsletter", status="new")
+    lead = create_lead(data, source="newsletter", status="new", require_phone=True)
     settings = get_site_settings()
     return api_response(
         True,
@@ -3346,7 +3356,7 @@ def admin_update_lead(user, lead_id):
     execute_write("UPDATE leads SET status = %s WHERE id = %s", (status, lead_id))
     lead = fetch_one(
         """
-        SELECT id, full_name, email, company, service_type, status, created_at, updated_at
+        SELECT id, full_name, email, company, phone, service_type, status, created_at, updated_at
         FROM leads
         WHERE id = %s
         """,
@@ -3361,7 +3371,7 @@ def admin_convert_lead(user, lead_id):
     require_database()
     lead = fetch_one(
         """
-        SELECT id, full_name, email, company, website, service_type, message, source, status, created_at, updated_at
+        SELECT id, full_name, email, company, website, phone, service_type, message, source, status, created_at, updated_at
         FROM leads
         WHERE id = %s
         """,

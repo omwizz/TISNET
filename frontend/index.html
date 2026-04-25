@@ -296,7 +296,6 @@
               <span class="service-tag">E-commerce</span>
               <span class="service-tag">CRM / ERP</span>
             </div>
-            <button class="btn btn-ghost service-action" type="button" onclick="prefillService('web')">Quiero este servicio</button>
           </article>
 
           <article class="service-card">
@@ -308,7 +307,6 @@
               <span class="service-tag">Workflows</span>
               <span class="service-tag">Agenda</span>
             </div>
-            <button class="btn btn-ghost service-action" type="button" onclick="prefillService('automation')">Quiero este servicio</button>
           </article>
 
           <article class="service-card">
@@ -320,7 +318,6 @@
               <span class="service-tag">Identidad</span>
               <span class="service-tag">Diseño</span>
             </div>
-            <button class="btn btn-ghost service-action" type="button" onclick="prefillService('branding')">Quiero este servicio</button>
           </article>
         </div>
 
@@ -404,7 +401,7 @@
               <span class="section-label">Solicitar Servicio</span>
               <h2 class="section-title">Cuéntanos tu proyecto<br>y activamos el siguiente paso</h2>
               <p class="section-desc">
-                Este formulario guarda la solicitud en MySQL, registra un lead para el CRM y deja lista la transición hacia Calendly y correo.
+                Este formulario guarda la solicitud en PostgreSQL, registra un lead para el CRM y deja lista la transición hacia Calendly y correo.
               </p>
               <div class="support-grid">
                 <div class="support-chip">
@@ -439,6 +436,13 @@
                 <div class="form-group">
                   <label class="form-label" for="newsletter-website">Red social (opcional)</label>
                   <input class="form-input" id="newsletter-website" name="website" type="text" placeholder="@tu_marca o https://tiktok.com/@tu_marca">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="newsletter-phone">Telefono</label>
+                  <div class="phone-input-shell">
+                    <span class="phone-input-prefix">+51</span>
+                    <input class="form-input phone-input-control" id="newsletter-phone" name="phone" type="text" inputmode="numeric" maxlength="9" placeholder="999999999" autocomplete="tel-national" required>
+                  </div>
                 </div>
               </div>
 
@@ -937,9 +941,11 @@
       </div>
       <p class="panel-sub" id="case-modal-description"></p>
       <div class="case-highlights" id="case-modal-highlights"></div>
-      <div class="action-row">
-        <button class="btn btn-accent" type="button" onclick="openScheduleModal('public')">Agendar reunion</button>
-        <button class="btn btn-outline" type="button" onclick="scrollToNewsletter()">Solicitar algo similar</button>
+      <div class="case-modal-layout">
+        <div class="case-modal-copy">
+          <div class="case-metrics-strip" id="case-modal-metrics"></div>
+        </div>
+        <div class="case-mockup-stage" id="case-modal-mockups"></div>
       </div>
     </div>
   </div>

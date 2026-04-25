@@ -398,9 +398,9 @@ function cacheDom() {
   dom.heroPrimaryCta = document.getElementById('hero-primary-cta');
   dom.ctaPrimaryCta = document.getElementById('cta-primary-cta');
   dom.footerMeetingLink = document.getElementById('footer-meeting-link');
-  dom.caseModalMeetingCta = document.querySelector('.case-modal .action-row .btn.btn-accent');
   dom.newsletterWebsiteLabel = document.querySelector('label[for="newsletter-website"]');
   dom.newsletterWebsiteInput = document.getElementById('newsletter-website');
+  dom.newsletterPhone = document.getElementById('newsletter-phone');
   dom.registerWebsiteLabel = document.querySelector('label[for="register-website"]');
   dom.registerWebsiteInput = document.getElementById('register-website');
 
@@ -426,6 +426,8 @@ function cacheDom() {
   dom.caseModalTitle = document.getElementById('case-modal-title');
   dom.caseModalDescription = document.getElementById('case-modal-description');
   dom.caseModalHighlights = document.getElementById('case-modal-highlights');
+  dom.caseModalMetrics = document.getElementById('case-modal-metrics');
+  dom.caseModalMockups = document.getElementById('case-modal-mockups');
 
   dom.scheduleModalLabel = document.getElementById('schedule-modal-label');
   dom.scheduleModalTitle = document.getElementById('schedule-modal-title');
@@ -504,6 +506,7 @@ function bindStaticEvents() {
   dom.portfolioTrack?.addEventListener('scroll', syncPortfolioProgress, { passive: true });
   dom.portfolioTrack?.addEventListener('mouseenter', stopPortfolioAutoplay);
   dom.portfolioTrack?.addEventListener('mouseleave', startPortfolioAutoplay);
+  dom.newsletterPhone?.addEventListener('input', handlePhoneInput);
 
   document.addEventListener('submit', handleDynamicSubmit);
   document.addEventListener('keydown', handleGlobalKeydown);
@@ -1247,10 +1250,6 @@ function renderPublicContent() {
     dom.footerMeetingLink.textContent = 'Solicitar reunion';
   }
 
-  if (dom.caseModalMeetingCta) {
-    dom.caseModalMeetingCta.textContent = 'Agendar reunion';
-  }
-
   if (dom.newsletterWebsiteLabel) {
     dom.newsletterWebsiteLabel.textContent = 'Red social (opcional)';
   }
@@ -1283,8 +1282,7 @@ function renderPublicContent() {
             <p class="portfolio-slide-copy">${escapeHtml(item.short_description || 'Proyecto digital desarrollado por TISNET.')}</p>
             <div class="portfolio-slide-highlights">${buildPortfolioHighlights(item)}</div>
             <div class="portfolio-slide-actions">
-              <button class="btn btn-accent" type="button" onclick="openCaseModal('${escapeAttribute(item.slug)}')">Ver caso</button>
-              <button class="btn btn-ghost" type="button" onclick="openWA('Hola TISNET, quiero cotizar un proyecto parecido a ${escapeAttribute(item.title)}.')">WhatsApp</button>
+              <button class="btn btn-accent" type="button" onclick="openCaseModal('${escapeAttribute(item.slug)}')">Ver</button>
             </div>
           </article>
         `
@@ -1421,6 +1419,101 @@ function buildPortfolioHighlights(item) {
   return [item.highlight_1, item.highlight_2, item.highlight_3]
     .filter(Boolean)
     .map((highlight) => `<span class="portfolio-highlight">${escapeHtml(highlight)}</span>`)
+    .join('');
+}
+
+function buildCaseMetrics(item) {
+  const metrics = [
+    { label: 'Categoria', value: item.category || 'Proyecto digital' },
+    { label: 'Foco', value: item.highlight_1 || 'Conversion' },
+    { label: 'Sistema', value: item.highlight_2 || 'Experiencia web' },
+    { label: 'Entrega', value: item.highlight_3 || 'Escalable' },
+  ];
+
+  return metrics
+    .map(
+      (metric) => `
+        <article class="case-metric-card">
+          <span class="case-metric-label">${escapeHtml(metric.label)}</span>
+          <strong class="case-metric-value">${escapeHtml(metric.value)}</strong>
+        </article>
+      `
+    )
+    .join('');
+}
+
+function casePalette(category = '') {
+  const key = String(category || '').toLowerCase();
+  if (key.includes('branding')) {
+    return { tone: 'warm', icon: '✦' };
+  }
+  if (key.includes('automat')) {
+    return { tone: 'violet', icon: '⚡' };
+  }
+  if (key.includes('crm') || key.includes('saas')) {
+    return { tone: 'emerald', icon: '▣' };
+  }
+  return { tone: 'cyan', icon: '◉' };
+}
+
+function buildCaseMockups(item) {
+  const bullets = [item.highlight_1, item.highlight_2, item.highlight_3].filter(Boolean);
+  const palette = casePalette(item.category);
+  const shortCopy = item.short_description || 'Proyecto digital creado por TISNET.';
+  const mockups = [
+    {
+      skin: 'browser',
+      motion: 'is-up',
+      eyebrow: 'Vista principal',
+      title: item.title,
+      copy: shortCopy,
+    },
+    {
+      skin: 'phone',
+      motion: 'is-down',
+      eyebrow: 'Bloque comercial',
+      title: bullets[0] || 'Experiencia cuidada',
+      copy: bullets[1] || 'Jerarquia visual pensada para captar y convertir.',
+    },
+    {
+      skin: 'panel',
+      motion: 'is-side',
+      eyebrow: 'Sistema interno',
+      title: bullets[2] || item.category || 'Operacion conectada',
+      copy: 'Mockup conceptual con visuales, soporte operativo y narrativa comercial alineada.',
+    },
+  ];
+
+  return mockups
+    .map(
+      (mockup, index) => `
+        <article class="case-mockup-card ${mockup.motion} tone-${escapeAttribute(palette.tone)} skin-${escapeAttribute(mockup.skin)}" style="--mockup-delay:${index * 0.18}s">
+          <div class="case-mockup-top">
+            <span class="case-mockup-dot"></span>
+            <span class="case-mockup-dot"></span>
+            <span class="case-mockup-dot"></span>
+          </div>
+          <div class="case-mockup-body">
+            <span class="case-mockup-kicker">${escapeHtml(mockup.eyebrow)}</span>
+            <strong class="case-mockup-title">${escapeHtml(mockup.title)}</strong>
+            <p class="case-mockup-copy">${escapeHtml(mockup.copy)}</p>
+            <div class="case-mockup-tags">
+              ${bullets
+                .slice(0, 3)
+                .map(
+                  (bullet, bulletIndex) => `
+                    <span class="case-mockup-tag ${bulletIndex === 0 ? 'is-solid' : ''}">
+                      ${escapeHtml(bullet)}
+                    </span>
+                  `
+                )
+                .join('')}
+            </div>
+          </div>
+          <div class="case-mockup-glow">${escapeHtml(palette.icon)}</div>
+        </article>
+      `
+    )
     .join('');
 }
 
@@ -3442,11 +3535,24 @@ async function convertLeadToProject(leadId) {
 async function handleNewsletterSubmit(event) {
   event.preventDefault();
 
+  let phone = '';
+  try {
+    phone = normalizeLocalPhone(dom.newsletterPhone?.value || '');
+    if (dom.newsletterPhone) {
+      dom.newsletterPhone.value = phone;
+    }
+  } catch (error) {
+    setFeedback(dom.newsletterFeedback, error.message, 'error');
+    toast(error.message, 'error');
+    return;
+  }
+
   const payload = {
     full_name: dom.newsletterName.value.trim(),
     email: dom.newsletterEmail.value.trim(),
     company: document.getElementById('newsletter-company').value.trim(),
     website: document.getElementById('newsletter-website').value.trim(),
+    phone,
     service_type: dom.newsletterService.value,
     message: document.getElementById('newsletter-message').value.trim(),
   };
@@ -3860,6 +3966,12 @@ function openCaseModal(slug) {
     .filter(Boolean)
     .map((highlight) => `<span class="service-tag case-tag">${escapeHtml(highlight)}</span>`)
     .join('');
+  if (dom.caseModalMetrics) {
+    dom.caseModalMetrics.innerHTML = buildCaseMetrics(item);
+  }
+  if (dom.caseModalMockups) {
+    dom.caseModalMockups.innerHTML = buildCaseMockups(item);
+  }
   dom.caseModal.classList.remove('hidden');
 }
 
@@ -4322,19 +4434,59 @@ function renderProjectSpotlight(estimate) {
   if (dom.calcModuleGrid) {
     dom.calcModuleGrid.innerHTML = estimate.project.modules
       .map(
-        (module) => `
-          <article class="budget-module-card">
+        (module, index) => `
+          <article class="budget-module-card tone-${escapeAttribute(casePalette(estimate.project.label).tone)}">
+            <div class="budget-module-eyebrow">
+              <span class="budget-module-icon">${escapeHtml(getBudgetModuleIcon(module.key))}</span>
+              <span class="budget-module-index">Modulo ${index + 1}</span>
+            </div>
             <div class="budget-module-top">
               <strong>${escapeHtml(module.title)}</strong>
               <span>Incluido</span>
             </div>
             <p>${escapeHtml(module.summary)}</p>
+            <ul class="budget-module-list">
+              ${module.bullets
+                .slice(0, 3)
+                .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
+                .join('')}
+            </ul>
             <button class="budget-option-link" type="button" onclick="openQuoteModuleDetail('${escapeAttribute(estimate.projectKey)}', '${escapeAttribute(module.key)}')">Ver detalles</button>
           </article>
         `
       )
       .join('');
   }
+}
+
+function getBudgetModuleIcon(key) {
+  const icons = {
+    hero: '✦',
+    'lead-form': '✎',
+    proof: '★',
+    responsive: '◌',
+    'service-architecture': '▦',
+    trust: '✓',
+    'contact-flow': '➜',
+    'content-pages': '▤',
+    cart: '🛒',
+    payments: '💳',
+    inventory: '◫',
+    admin: '⚙',
+    profile: '◉',
+    projects: '▣',
+    services: '✦',
+    contact: '☎',
+    auth: '🔐',
+    dashboard: '📊',
+    workflows: '⇄',
+    reports: '▥',
+    tenant: '⬢',
+    roles: '☰',
+    billing: '◎',
+    metrics: '◌',
+  };
+  return icons[key] || '◦';
 }
 
 function updatePricingCalculator() {
@@ -4676,6 +4828,13 @@ function normalizeLocalPhone(value) {
     throw new Error('El telefono debe tener 9 digitos.');
   }
   return digits;
+}
+
+function handlePhoneInput(event) {
+  if (!event?.target) {
+    return;
+  }
+  event.target.value = extractLocalPhone(event.target.value);
 }
 
 function selectDiagnosticStage(button) {
