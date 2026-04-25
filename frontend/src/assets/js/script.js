@@ -390,6 +390,7 @@ function cacheDom() {
   dom.portfolioTrack = document.getElementById('portfolio-track');
   dom.portfolioProgress = document.getElementById('portfolio-progress');
   dom.homeProjectGrid = document.getElementById('home-project-grid');
+  dom.homeProjectWall = document.getElementById('home-project-wall');
   dom.clientLogos = document.getElementById('client-logos');
   dom.teamExpertsGrid = document.getElementById('team-experts-grid');
   dom.footerTagline = document.getElementById('footer-tagline');
@@ -1100,6 +1101,119 @@ function handleMobileNavAction(action) {
   renderMobileNavigation();
 }
 
+function getHomeShowcaseTheme(index) {
+  const themes = [
+    {
+      start: 'rgba(14, 26, 58, 0.96)',
+      end: 'rgba(10, 102, 194, 0.88)',
+      glow: 'rgba(0, 212, 255, 0.28)',
+      tint: 'rgba(122, 214, 255, 0.16)',
+    },
+    {
+      start: 'rgba(20, 18, 46, 0.96)',
+      end: 'rgba(78, 91, 255, 0.82)',
+      glow: 'rgba(128, 145, 255, 0.24)',
+      tint: 'rgba(128, 145, 255, 0.16)',
+    },
+    {
+      start: 'rgba(14, 32, 34, 0.96)',
+      end: 'rgba(12, 131, 142, 0.84)',
+      glow: 'rgba(38, 211, 190, 0.22)',
+      tint: 'rgba(38, 211, 190, 0.14)',
+    },
+    {
+      start: 'rgba(34, 18, 44, 0.96)',
+      end: 'rgba(134, 49, 191, 0.82)',
+      glow: 'rgba(210, 111, 255, 0.2)',
+      tint: 'rgba(210, 111, 255, 0.14)',
+    },
+  ];
+
+  return themes[index % themes.length];
+}
+
+function buildHomeShowcaseCard(item, index) {
+  const theme = getHomeShowcaseTheme(index);
+  const highlights = [item.highlight_1, item.highlight_2, item.highlight_3].filter(Boolean).slice(0, 2);
+  const slugLabel = (item.slug || item.title || `proyecto-${index + 1}`).replaceAll('-', '/');
+
+  return `
+    <article
+      class="home-showcase-card"
+      style="--showcase-start:${escapeAttribute(theme.start)}; --showcase-end:${escapeAttribute(theme.end)}; --showcase-glow:${escapeAttribute(theme.glow)}; --showcase-tint:${escapeAttribute(theme.tint)};"
+    >
+      <div class="home-showcase-browser">
+        <div class="home-showcase-dots" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <span class="home-showcase-url">tisnet.space/${escapeHtml(slugLabel)}</span>
+      </div>
+
+      <div class="home-showcase-screen">
+        <div class="home-showcase-card-top">
+          <span class="home-showcase-kicker">${escapeHtml(item.category || 'Proyecto digital')}</span>
+          <span class="home-showcase-icon">${escapeHtml(item.icon || '•')}</span>
+        </div>
+
+        <h3 class="home-showcase-card-title">${escapeHtml(item.title || 'Proyecto TISNET')}</h3>
+        <p class="home-showcase-card-copy">${escapeHtml(item.short_description || 'Solucion digital creada para crecer con mejor estructura, conversion y operacion.')}</p>
+
+        <div class="home-showcase-wireframe" aria-hidden="true">
+          <span class="is-primary"></span>
+          <span class="is-wide"></span>
+          <span></span>
+          <span class="is-soft"></span>
+        </div>
+
+        <div class="home-showcase-chip-row">
+          ${highlights
+            .map(
+              (highlight) => `
+                <span class="home-showcase-chip">${escapeHtml(highlight)}</span>
+              `
+            )
+            .join('')}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderHomeProjectWall(portfolio) {
+  if (!dom.homeProjectWall) {
+    return;
+  }
+
+  if (!portfolio?.length) {
+    dom.homeProjectWall.innerHTML = '';
+    return;
+  }
+
+  const columnCount = 4;
+  const minimumCards = 14;
+  const source = Array.from({ length: Math.max(minimumCards, portfolio.length * 2) }, (_, index) => portfolio[index % portfolio.length]);
+  const columns = Array.from({ length: columnCount }, () => []);
+
+  source.forEach((item, index) => {
+    columns[index % columnCount].push(buildHomeShowcaseCard(item, index));
+  });
+
+  dom.homeProjectWall.innerHTML = columns
+    .map(
+      (cards, index) => `
+        <div
+          class="home-showcase-column ${index % 2 === 0 ? 'is-moving-up' : 'is-moving-down'}"
+          style="--showcase-duration:${18 + index * 2}s; --showcase-delay:-${index * 1.6}s; --showcase-drift:${56 + index * 12}px;"
+        >
+          ${cards.join('')}
+        </div>
+      `
+    )
+    .join('');
+}
+
 function renderPublicContent() {
   if (!state.publicContent) {
     return;
@@ -1194,6 +1308,10 @@ function renderPublicContent() {
         `
       )
       .join('');
+  }
+
+  if (dom.homeProjectWall) {
+    renderHomeProjectWall(portfolio);
   }
 
   if (dom.portfolioProgress) {
