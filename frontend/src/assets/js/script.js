@@ -307,45 +307,45 @@ const PRICING_CALCULATOR = {
 // Para editar o agregar integrantes, modifica este arreglo.
 const TEAM_EXPERTS = [
   {
-    name: 'Keiko',
+    name: 'Fernanda',
     role: 'Lider de estrategia',
     bio: 'Define la direccion comercial del proyecto, ordena prioridades y aterriza la hoja de ruta para que cada fase nazca con foco real de negocio.',
     focus: ['Arquitectura comercial', 'Prioridades de lanzamiento', 'Vision de crecimiento'],
     monogram: 'LE',
-    image: 'img/team/Keiko Lider.png',
+    image: 'img/team/perso1.png',
     surfaceStart: 'rgba(0,212,255,.24)',
     surfaceEnd: 'rgba(10,102,194,.16)',
     glow: 'rgba(0,212,255,.4)',
   },
   {
-    name: 'Philip',
+    name: 'Omar',
     role: 'Especialista UX/UI',
     bio: 'Da forma a una interfaz clara, atractiva y consistente con la marca para que cada seccion tenga jerarquia, confianza y llamados a la accion bien resueltos.',
     focus: ['Narrativa visual', 'Jerarquia de interfaz', 'Experiencia responsive'],
     monogram: 'UX',
-    image: 'img/team/philip-uxui.png',
+    image: 'img/team/perso2.png',
     surfaceStart: 'rgba(77,163,255,.2)',
     surfaceEnd: 'rgba(25,40,82,.16)',
     glow: 'rgba(77,163,255,.34)',
   },
   {
-    name: 'Carla',
+    name: 'José',
     role: 'Lead de automatizacion y leads',
     bio: 'Convierte el interes en oportunidades reales con una operacion comercial mejor conectada entre formularios, seguimiento, agenda y automatizaciones.',
     focus: ['Leads calificados', 'Automatizacion comercial', 'Seguimiento y agenda'],
     monogram: 'AT',
-    image: 'img/team/carla-leads.png',
+    image: 'img/team/perso3.png',
     surfaceStart: 'rgba(19,191,163,.24)',
     surfaceEnd: 'rgba(7,70,74,.16)',
     glow: 'rgba(19,191,163,.32)',
   },
   {
-    name: 'Javier',
+    name: 'Alexander',
     role: 'Frontend, backend e integraciones',
     bio: 'Asegura que todo funcione de extremo a extremo: rendimiento, conexion entre modulos, estabilidad del panel y calidad antes de publicar.',
     focus: ['Frontend y backend', 'Integraciones API', 'Calidad y despliegue'],
     monogram: 'DQ',
-    image: 'img/team/Javier QA.png',
+    image: 'img/team/perso4 .png',
     surfaceStart: 'rgba(245,158,11,.22)',
     surfaceEnd: 'rgba(66,37,10,.18)',
     glow: 'rgba(245,158,11,.26)',
@@ -1306,7 +1306,6 @@ function renderPortfolioMemoryGrid(portfolio) {
                 </span>
                 <span class="portfolio-memory-icon">${escapeHtml(item.icon || '*')}</span>
               </span>
-              <span class="portfolio-memory-hint">Pasa el mouse</span>
             </span>
             <span class="portfolio-memory-face portfolio-memory-back">
               <span class="portfolio-memory-back-kicker">${escapeHtml(item.category || 'Caso TISNET')}</span>
