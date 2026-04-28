@@ -112,6 +112,21 @@ LEAD_STATUS_ORDER = ["new", "contacted", "negotiating", "won"]
 PROJECT_STATUS_ORDER = ["backlog", "in_progress", "review", "delivered"]
 TASK_STATUS_ORDER = ["pending", "in_progress", "done"]
 TASK_PRIORITY_ORDER = ["low", "medium", "high"]
+PROCESS_STAGE_ORDER = ["kickoff", "diagnostic", "proposal", "execution", "delivery"]
+PROCESS_STAGE_LABELS = {
+    "kickoff": "Kickoff",
+    "diagnostic": "Diagnostico",
+    "proposal": "Propuesta tecnica comercial",
+    "execution": "Ejecucion del proyecto",
+    "delivery": "Entrega final",
+}
+PROCESS_STAGE_COPY = {
+    "kickoff": "Primera reunion y arranque formal del proyecto.",
+    "diagnostic": "Formulario, evaluacion y validacion del diagnostico.",
+    "proposal": "Revision y aprobacion de la propuesta tecnica comercial.",
+    "execution": "Avances, validaciones y retroalimentacion de entregables.",
+    "delivery": "Cierre, entrega final y reunion de conformidad.",
+}
 TEAM_MEMBER_SEED = [
     {
         "full_name": "Cristian Arens",
@@ -724,9 +739,12 @@ def ensure_project(
         """
         INSERT INTO projects (
             slug, client_user_id, lead_id, title, service_type, status, admin_status, summary,
-            budget, progress_percent, start_date, due_date
+            budget, progress_percent, kickoff_meeting_confirmed, diagnostic_validated,
+            proposal_validated, proposal_reviewed, execution_validated_count,
+            final_meeting_requested, advance_payment_percent, start_date, due_date
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 0, 0, 0, 0, 0, 0, %s, %s)
+        RETURNING id
         """,
         (
             slug,
@@ -1483,7 +1501,7 @@ def create_onboarding_project_for_user(user_id, company_name):
             "backlog",
             "Fase inicial de descubrimiento, diagnóstico y definición de alcance técnico.",
             0,
-            15,
+            7,
             today.isoformat(),
             (today + timedelta(days=14)).isoformat(),
         ),
@@ -1719,9 +1737,10 @@ def ensure_client_user_from_lead(lead):
 
 def create_project_milestones(project_id, start_date, due_date):
     total_days = max(7, (due_date - start_date).days)
-    discovery_due = start_date + timedelta(days=max(2, total_days // 4))
-    build_due = start_date + timedelta(days=max(4, total_days // 2))
-    qa_due = start_date + timedelta(days=max(6, (total_days * 3) // 4))
+    kickoff_due = start_date + timedelta(days=1)
+    diagnostic_due = start_date + timedelta(days=max(2, total_days // 5))
+    proposal_due = start_date + timedelta(days=max(4, (total_days * 2) // 5))
+    execution_due = start_date + timedelta(days=max(6, (total_days * 4) // 5))
 
     execute_many(
         """
@@ -1729,10 +1748,11 @@ def create_project_milestones(project_id, start_date, due_date):
         VALUES (%s, %s, %s, %s, %s, %s)
         """,
         [
-            (project_id, "Discovery y alcance", "in_progress", 20, 1, discovery_due.isoformat()),
-            (project_id, "Diseno y arquitectura", "pending", 0, 2, build_due.isoformat()),
-            (project_id, "Desarrollo e integraciones", "pending", 0, 3, qa_due.isoformat()),
-            (project_id, "QA y entrega", "pending", 0, 4, due_date.isoformat()),
+            (project_id, "Kickoff", "in_progress", 33, 1, kickoff_due.isoformat()),
+            (project_id, "Diagnostico", "pending", 0, 2, diagnostic_due.isoformat()),
+            (project_id, "Propuesta tecnica comercial", "pending", 0, 3, proposal_due.isoformat()),
+            (project_id, "Ejecucion del proyecto", "pending", 0, 4, execution_due.isoformat()),
+            (project_id, "Entrega final", "pending", 0, 5, due_date.isoformat()),
         ],
     )
 
@@ -1757,6 +1777,13 @@ def create_project_from_lead(lead, actor_role="admin"):
             projects.summary,
             projects.budget,
             projects.progress_percent,
+            projects.kickoff_meeting_confirmed,
+            projects.diagnostic_validated,
+            projects.proposal_validated,
+            projects.proposal_reviewed,
+            projects.execution_validated_count,
+            projects.final_meeting_requested,
+            projects.advance_payment_percent,
             projects.start_date,
             projects.due_date,
             users.full_name AS client_name,
@@ -1818,7 +1845,7 @@ def create_project_from_lead(lead, actor_role="admin"):
             start_date,
             due_date
         )
-        VALUES (%s, %s, %s, %s, %s, 'in_progress', 'backlog', %s, %s, 10, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, 'in_progress', 'backlog', %s, %s, 7, %s, %s)
         """,
         (
             f"lead-{lead['id']}-{int(now_utc().timestamp())}",
@@ -1915,6 +1942,13 @@ def active_project_for_user(user_id):
             summary,
             budget,
             progress_percent,
+            kickoff_meeting_confirmed,
+            diagnostic_validated,
+            proposal_validated,
+            proposal_reviewed,
+            execution_validated_count,
+            final_meeting_requested,
+            advance_payment_percent,
             start_date,
             due_date,
             created_at,
@@ -1936,6 +1970,373 @@ def active_project_for_user(user_id):
         return None
     project["service_label"] = service_label(project["service_type"])
     return project
+
+
+def process_stage_label(stage_key):
+    return PROCESS_STAGE_LABELS.get(stage_key, stage_key.replace("_", " ").title())
+
+
+def truthy(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value).strip().lower() in {"1", "true", "yes", "si", "on"}
+
+
+def fetch_project_documents(project_id, visible_only=False):
+    where_parts = ["project_documents.project_id = %s"]
+    params = [project_id]
+    if visible_only:
+        where_parts.append("project_documents.is_visible_to_client = 1")
+        where_parts.append("project_documents.status = 'published'")
+
+    return fetch_all(
+        f"""
+        SELECT
+            project_documents.id,
+            project_documents.project_id,
+            project_documents.stage_key,
+            project_documents.document_type,
+            project_documents.title,
+            project_documents.note,
+            project_documents.resource_url,
+            project_documents.file_name,
+            project_documents.status,
+            project_documents.is_visible_to_client,
+            project_documents.created_by_user_id,
+            project_documents.created_at,
+            project_documents.updated_at,
+            users.full_name AS created_by_name
+        FROM project_documents
+        LEFT JOIN users ON project_documents.created_by_user_id = users.id
+        WHERE {" AND ".join(where_parts)}
+        ORDER BY project_documents.created_at DESC
+        """,
+        tuple(params),
+    )
+
+
+def fetch_feedback_requests(project_id=None, status=None, limit=50):
+    where_parts = []
+    params = []
+    if project_id:
+        where_parts.append("feedback_requests.project_id = %s")
+        params.append(project_id)
+    if status:
+        where_parts.append("feedback_requests.status = %s")
+        params.append(status)
+    where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+    params.append(limit)
+
+    return fetch_all(
+        f"""
+        SELECT
+            feedback_requests.id,
+            feedback_requests.project_id,
+            feedback_requests.stage_key,
+            feedback_requests.target_type,
+            feedback_requests.target_id,
+            feedback_requests.message,
+            feedback_requests.status,
+            feedback_requests.requested_by_user_id,
+            feedback_requests.created_at,
+            feedback_requests.updated_at,
+            projects.title AS project_title,
+            users.full_name AS client_name,
+            users.email AS client_email,
+            users.company AS client_company
+        FROM feedback_requests
+        JOIN projects ON feedback_requests.project_id = projects.id
+        JOIN users ON projects.client_user_id = users.id
+        {where_sql}
+        ORDER BY
+            CASE feedback_requests.status
+                WHEN 'pending' THEN 0
+                WHEN 'in_review' THEN 1
+                WHEN 'resolved' THEN 2
+                ELSE 3
+            END,
+            feedback_requests.created_at DESC
+        LIMIT %s
+        """,
+        tuple(params),
+    )
+
+
+def document_matches(document, stage_key=None, document_types=None):
+    if stage_key and document.get("stage_key") != stage_key:
+        return False
+    if document_types and document.get("document_type") not in document_types:
+        return False
+    return True
+
+
+def latest_document(documents, stage_key=None, document_types=None):
+    return next(
+        (
+            document
+            for document in documents
+            if document_matches(document, stage_key=stage_key, document_types=document_types)
+        ),
+        None,
+    )
+
+
+def meeting_matches(meetings, keywords):
+    normalized_keywords = [keyword.lower() for keyword in keywords]
+    for meeting in meetings or []:
+        text = f"{meeting.get('meeting_type') or ''} {meeting.get('status') or ''}".lower()
+        if any(keyword in text for keyword in normalized_keywords):
+            return meeting
+    return None
+
+
+def stage_status_from_percent(percent):
+    if percent >= 100:
+        return "done"
+    if percent > 0:
+        return "in_progress"
+    return "pending"
+
+
+def build_process_stage(key, percent, message, actions=None, documents=None, feedbacks=None):
+    return {
+        "key": key,
+        "title": process_stage_label(key),
+        "copy": PROCESS_STAGE_COPY.get(key, ""),
+        "percent": int(max(0, min(100, percent))),
+        "status": stage_status_from_percent(percent),
+        "message": message,
+        "actions": actions or [],
+        "documents": documents or [],
+        "feedbacks": feedbacks or [],
+    }
+
+
+def build_process_flow(project, diagnostic, meetings, documents, feedbacks):
+    visible_documents = [
+        document
+        for document in documents
+        if truthy(document.get("is_visible_to_client")) and document.get("status") == "published"
+    ]
+    pending_feedbacks = [item for item in feedbacks if item.get("status") != "resolved"]
+
+    kickoff_meeting = meeting_matches(meetings, ["kickoff", "inicial"])
+    proposal_meeting = meeting_matches(meetings, ["propuesta"])
+    close_meeting = meeting_matches(meetings, ["cierre", "entrega final"])
+    evaluation_doc = latest_document(visible_documents, "diagnostic", {"evaluation", "diagnostic_evaluation", "note"})
+    proposal_doc = latest_document(visible_documents, "proposal", {"proposal", "note", "link", "document"})
+    execution_docs = [
+        document
+        for document in visible_documents
+        if document.get("stage_key") == "execution"
+    ]
+    delivery_doc = latest_document(visible_documents, "delivery")
+
+    kickoff_percent = 33
+    if kickoff_meeting:
+        kickoff_percent = 66
+    if truthy(project.get("kickoff_meeting_confirmed")):
+        kickoff_percent = 100
+
+    diagnostic_percent = 0
+    if diagnostic:
+        diagnostic_percent = 33
+    if evaluation_doc:
+        diagnostic_percent = max(diagnostic_percent, 66)
+    if truthy(project.get("diagnostic_validated")):
+        diagnostic_percent = 100
+
+    proposal_percent = 0
+    if proposal_doc:
+        proposal_percent = 33
+    if truthy(project.get("proposal_reviewed")) or proposal_meeting:
+        proposal_percent = max(proposal_percent, 66)
+    if truthy(project.get("proposal_validated")):
+        proposal_percent = 100
+
+    try:
+        execution_count = int(project.get("execution_validated_count") or 0)
+    except (TypeError, ValueError):
+        execution_count = 0
+    execution_count = max(0, min(3, execution_count))
+    execution_percent = {0: 0, 1: 33, 2: 66, 3: 100}[execution_count]
+
+    delivery_percent = 0
+    if execution_percent >= 100:
+        delivery_percent = 33
+    if truthy(project.get("final_meeting_requested")) or close_meeting:
+        delivery_percent = max(delivery_percent, 66)
+    if project.get("status") in {"completed", "delivered"} or delivery_doc:
+        delivery_percent = 100
+
+    stages = [
+        build_process_stage(
+            "kickoff",
+            kickoff_percent,
+            "Cuenta activa. Agenda y confirma tu reunion de kickoff para continuar con el diagnostico."
+            if kickoff_percent < 100
+            else "Kickoff completado. Continua con tu diagnostico.",
+            actions=[
+                {"type": "schedule", "context": "client-kickoff", "label": "Agendar kickoff", "style": "primary"}
+                if kickoff_percent < 66
+                else None,
+                {"type": "confirm_kickoff", "label": "Ya tuve mi reunion", "style": "accent"}
+                if kickoff_percent >= 66 and kickoff_percent < 100
+                else None,
+                {"type": "go_diagnostic", "label": "Continua con tu diagnostico", "style": "ghost"}
+                if kickoff_percent >= 100
+                else None,
+            ],
+            documents=[],
+            feedbacks=[],
+        ),
+        build_process_stage(
+            "diagnostic",
+            diagnostic_percent,
+            "Completa tu diagnostico para que TISNET pueda evaluarlo."
+            if diagnostic_percent < 33
+            else "Evaluacion publicada. Puedes validarla o enviar retroalimentacion."
+            if diagnostic_percent >= 66 and diagnostic_percent < 100
+            else "Tu diagnostico ha sido validado correctamente. Espera tu propuesta tecnica comercial. Te aparecera en tu historial cuando este disponible."
+            if diagnostic_percent >= 100
+            else "Diagnostico recibido. El equipo publicara la evaluacion del proyecto.",
+            actions=[
+                {"type": "go_diagnostic", "label": "Completar diagnostico", "style": "primary"}
+                if diagnostic_percent < 33
+                else None,
+                {"type": "validate_diagnostic", "label": "Validar", "style": "accent"}
+                if diagnostic_percent >= 66 and diagnostic_percent < 100
+                else None,
+                {"type": "feedback_diagnostic", "label": "Retroalimentar", "style": "ghost"}
+                if diagnostic_percent >= 66 and diagnostic_percent < 100
+                else None,
+                {"type": "go_history", "label": "Ir a historial", "style": "ghost"}
+                if diagnostic_percent >= 100
+                else None,
+            ],
+            documents=[evaluation_doc] if evaluation_doc else [],
+            feedbacks=[item for item in pending_feedbacks if item.get("stage_key") == "diagnostic"],
+        ),
+        build_process_stage(
+            "proposal",
+            proposal_percent,
+            "Aun no hay propuesta tecnica comercial publicada."
+            if proposal_percent < 33
+            else "Revisa la propuesta tecnica comercial, agenda reunion si lo necesitas y validala para iniciar ejecucion.",
+            actions=[
+                {"type": "open_document", "label": "Ver propuesta tecnica comercial", "style": "primary", "url": proposal_doc.get("resource_url")}
+                if proposal_doc and proposal_doc.get("resource_url")
+                else None,
+                {"type": "schedule", "context": "client-proposal", "label": "Agendar reunion para revisar propuesta", "style": "ghost"}
+                if proposal_percent >= 33 and proposal_percent < 100
+                else None,
+                {"type": "mark_proposal_reviewed", "label": "Marcar como revisada", "style": "ghost"}
+                if proposal_percent >= 33 and proposal_percent < 66
+                else None,
+                {"type": "validate_proposal", "label": "Validar propuesta", "style": "accent"}
+                if proposal_percent >= 33 and proposal_percent < 100
+                else None,
+                {"type": "feedback_proposal", "label": "Retroalimentar", "style": "ghost"}
+                if proposal_percent >= 33 and proposal_percent < 100
+                else None,
+            ],
+            documents=[proposal_doc] if proposal_doc else [],
+            feedbacks=[item for item in pending_feedbacks if item.get("stage_key") == "proposal"],
+        ),
+        build_process_stage(
+            "execution",
+            execution_percent,
+            "El equipo publicara avances con notas, links o archivos para validacion."
+            if not execution_docs
+            else "Valida cada avance o deja retroalimentacion para que el equipo libere una nueva version.",
+            actions=[
+                {"type": "validate_advance", "label": "Validar avance", "style": "accent"}
+                if execution_docs and execution_percent < 100
+                else None,
+                {"type": "feedback_advance", "label": "Retroalimentar avance", "style": "ghost"}
+                if execution_docs and execution_percent < 100
+                else None,
+                {"type": "request_final_meeting", "label": "Agendar entrega final", "style": "primary"}
+                if execution_percent >= 100
+                else None,
+            ],
+            documents=execution_docs,
+            feedbacks=[item for item in pending_feedbacks if item.get("stage_key") == "execution"],
+        ),
+        build_process_stage(
+            "delivery",
+            delivery_percent,
+            "Cuando el avance final este validado, podras cerrar con reunion y entrega final."
+            if delivery_percent < 100
+            else "Entrega final publicada y lista para cierre.",
+            actions=[
+                {"type": "schedule", "context": "client-close", "label": "Agendar reunion de cierre", "style": "primary"}
+                if delivery_percent >= 33 and delivery_percent < 100
+                else None,
+                {"type": "go_history", "label": "Ver entregables", "style": "ghost"}
+                if delivery_percent >= 100
+                else None,
+            ],
+            documents=[delivery_doc] if delivery_doc else [],
+            feedbacks=[item for item in pending_feedbacks if item.get("stage_key") == "delivery"],
+        ),
+    ]
+
+    for stage in stages:
+        stage["actions"] = [action for action in stage["actions"] if action]
+
+    overall = round(sum(stage["percent"] for stage in stages) / len(stages)) if stages else 0
+    return {
+        "overallProgress": overall,
+        "currentStage": next((stage for stage in stages if stage["percent"] < 100), stages[-1] if stages else None),
+        "stages": stages,
+    }
+
+
+def build_project_timeline(history, documents, feedbacks):
+    items = []
+    for entry in history or []:
+        items.append(
+            {
+                "kind": "history",
+                "title": entry.get("title") or "Actividad del proyecto",
+                "detail": entry.get("detail") or "",
+                "created_at": entry.get("created_at"),
+            }
+        )
+    for document in documents or []:
+        items.append(
+            {
+                "kind": "document",
+                "title": document.get("title") or "Documento publicado",
+                "detail": f"{process_stage_label(document.get('stage_key') or '')} - {document.get('note') or document.get('resource_url') or 'Visible para el cliente.'}",
+                "created_at": document.get("created_at"),
+                "url": document.get("resource_url"),
+            }
+        )
+    for feedback in feedbacks or []:
+        items.append(
+            {
+                "kind": "feedback",
+                "title": f"Retroalimentacion enviada - {process_stage_label(feedback.get('stage_key') or '')}",
+                "detail": feedback.get("message") or "",
+                "created_at": feedback.get("created_at"),
+                "status": feedback.get("status"),
+            }
+        )
+    items.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+    return items
+
+
+def sync_project_progress(project_id, progress_percent):
+    execute_write(
+        "UPDATE projects SET progress_percent = %s WHERE id = %s",
+        (int(max(0, min(100, progress_percent))), project_id),
+    )
 
 
 def dashboard_payload_for_client(user):
@@ -1990,6 +2391,14 @@ def dashboard_payload_for_client(user):
         """,
         (user["id"],),
     )
+    documents = fetch_project_documents(project["id"], visible_only=True)
+    feedback_requests = fetch_feedback_requests(project_id=project["id"], limit=30)
+    process_flow = build_process_flow(project, diagnostic, meetings, documents, feedback_requests)
+    previous_progress = int(project.get("progress_percent") or 0)
+    project["progress_percent"] = process_flow["overallProgress"]
+    if previous_progress != int(process_flow["overallProgress"]):
+        sync_project_progress(project["id"], process_flow["overallProgress"])
+    timeline = build_project_timeline(history, documents, feedback_requests)
 
     unread_messages = sum(1 for message in messages if message["is_unread_for_client"])
     completed_milestones = sum(1 for milestone in milestones if milestone["status"] == "done")
@@ -2001,8 +2410,12 @@ def dashboard_payload_for_client(user):
         "milestones": milestones,
         "messages": messages,
         "history": history,
+        "timeline": timeline,
         "meetings": meetings,
         "diagnostic": diagnostic,
+        "documents": documents,
+        "feedbackRequests": feedback_requests,
+        "processFlow": process_flow,
         "metrics": {
             "progress": project["progress_percent"],
             "completedMilestones": completed_milestones,
@@ -2247,6 +2660,13 @@ def admin_client_detail_payload(client_id):
         """,
         (client_id,),
     )
+    project_documents = fetch_project_documents(active_project["id"], visible_only=False) if active_project else []
+    feedback_requests = fetch_feedback_requests(project_id=active_project["id"], limit=30) if active_project else []
+    process_flow = (
+        build_process_flow(active_project, diagnostic, meetings, project_documents, feedback_requests)
+        if active_project
+        else {"overallProgress": 0, "currentStage": None, "stages": []}
+    )
 
     interaction_history = build_client_interaction_history(
         leads,
@@ -2282,6 +2702,9 @@ def admin_client_detail_payload(client_id):
         "activeProject": active_project,
         "projects": projects,
         "activeMilestones": active_milestones,
+        "projectDocuments": project_documents,
+        "feedbackRequests": feedback_requests,
+        "processFlow": process_flow,
         "meetings": meetings,
         "interactionHistory": interaction_history,
     }
@@ -2622,6 +3045,31 @@ def admin_overview_payload():
         LIMIT 20
         """
     )
+    project_documents = fetch_all(
+        """
+        SELECT
+            project_documents.id,
+            project_documents.project_id,
+            project_documents.stage_key,
+            project_documents.document_type,
+            project_documents.title,
+            project_documents.note,
+            project_documents.resource_url,
+            project_documents.file_name,
+            project_documents.status,
+            project_documents.is_visible_to_client,
+            project_documents.created_at,
+            projects.title AS project_title,
+            users.company AS client_company,
+            users.full_name AS client_name
+        FROM project_documents
+        JOIN projects ON project_documents.project_id = projects.id
+        JOIN users ON projects.client_user_id = users.id
+        ORDER BY project_documents.created_at DESC
+        LIMIT 30
+        """
+    )
+    feedback_requests = fetch_feedback_requests(limit=50)
 
     return {
         "metrics": {
@@ -2642,6 +3090,8 @@ def admin_overview_payload():
         "taskMetrics": task_metrics,
         "clients": clients,
         "meetings": meetings,
+        "projectDocuments": project_documents,
+        "feedbackRequests": feedback_requests,
         "settings": get_site_settings(),
         "serviceOptions": [{"value": key, "label": value} for key, value in SERVICE_LABELS.items()],
     }
@@ -3297,6 +3747,154 @@ def save_client_diagnostic(user):
     return api_response(True, "Diagnóstico guardado.", diagnostic=diagnostic)
 
 
+@app.route("/api/client/process/action", methods=["POST"])
+@require_auth("client")
+def client_process_action(user):
+    require_database()
+    data = request.get_json(force=True) or {}
+    action = (data.get("action") or "").strip()
+    project = active_project_for_user(user["id"])
+    if not project:
+        create_onboarding_project_for_user(user["id"], user.get("company") or user["full_name"])
+        project = active_project_for_user(user["id"])
+
+    if not action:
+        return api_response(False, "Selecciona una accion valida."), 400
+
+    if action == "confirm_kickoff":
+        if truthy(data.get("confirmed")):
+            execute_write(
+                "UPDATE projects SET kickoff_meeting_confirmed = 1 WHERE id = %s",
+                (project["id"],),
+            )
+            add_project_history(project["id"], "Kickoff confirmado", "El cliente confirmo que ya realizo la reunion de kickoff.")
+            message = "Kickoff confirmado. Continua con tu diagnostico."
+        else:
+            message = "Mantendremos el kickoff en 66% hasta que se complete la reunion."
+
+    elif action == "validate_diagnostic":
+        diagnostic = fetch_one(
+            "SELECT id FROM diagnostics WHERE user_id = %s ORDER BY updated_at DESC LIMIT 1",
+            (user["id"],),
+        )
+        if not diagnostic:
+            return api_response(False, "Completa el diagnostico antes de validarlo."), 400
+        execute_write(
+            "UPDATE projects SET diagnostic_validated = 1 WHERE id = %s",
+            (project["id"],),
+        )
+        add_project_history(
+            project["id"],
+            "Diagnostico validado",
+            "Tu diagnostico ha sido validado correctamente. Espera tu propuesta tecnica comercial.",
+        )
+        message = "Diagnostico validado correctamente."
+
+    elif action == "feedback_diagnostic":
+        feedback_message = (data.get("message") or "").strip()
+        if not feedback_message:
+            return api_response(False, "Escribe la retroalimentacion para el equipo."), 400
+        feedback_id = execute_write(
+            """
+            INSERT INTO feedback_requests (project_id, stage_key, target_type, message, requested_by_user_id)
+            VALUES (%s, 'diagnostic', 'evaluation', %s, %s)
+            """,
+            (project["id"], feedback_message, user["id"]),
+        )
+        add_project_history(project["id"], "Retroalimentacion de diagnostico", feedback_message)
+        message = f"Retroalimentacion enviada al equipo comercial. Ticket #{feedback_id}."
+
+    elif action == "mark_proposal_reviewed":
+        execute_write(
+            "UPDATE projects SET proposal_reviewed = 1 WHERE id = %s",
+            (project["id"],),
+        )
+        add_project_history(project["id"], "Propuesta revisada", "El cliente marco la propuesta tecnica comercial como revisada.")
+        message = "Propuesta marcada como revisada."
+
+    elif action == "validate_proposal":
+        try:
+            advance_percent = int(data.get("advance_payment_percent") or 20)
+        except (TypeError, ValueError):
+            advance_percent = 20
+        if advance_percent not in {10, 20, 30}:
+            advance_percent = 20
+        execute_write(
+            """
+            UPDATE projects
+            SET proposal_validated = 1,
+                proposal_reviewed = 1,
+                advance_payment_percent = %s,
+                admin_status = 'in_progress'
+            WHERE id = %s
+            """,
+            (advance_percent, project["id"]),
+        )
+        add_project_history(
+            project["id"],
+            "Propuesta validada",
+            f"El cliente valido la propuesta tecnica comercial. Anticipo requerido: {advance_percent}%.",
+        )
+        message = f"Propuesta validada. Se solicitara anticipo de {advance_percent}%."
+
+    elif action == "feedback_proposal":
+        feedback_message = (data.get("message") or "").strip()
+        if not feedback_message:
+            return api_response(False, "Escribe la retroalimentacion de la propuesta."), 400
+        feedback_id = execute_write(
+            """
+            INSERT INTO feedback_requests (project_id, stage_key, target_type, message, requested_by_user_id)
+            VALUES (%s, 'proposal', 'proposal', %s, %s)
+            """,
+            (project["id"], feedback_message, user["id"]),
+        )
+        add_project_history(project["id"], "Retroalimentacion de propuesta", feedback_message)
+        message = f"Retroalimentacion enviada. Ticket #{feedback_id}."
+
+    elif action == "validate_advance":
+        current_count = int(project.get("execution_validated_count") or 0)
+        next_count = min(3, current_count + 1)
+        execute_write(
+            "UPDATE projects SET execution_validated_count = %s, admin_status = %s WHERE id = %s",
+            (next_count, "review" if next_count >= 3 else "in_progress", project["id"]),
+        )
+        add_project_history(
+            project["id"],
+            "Avance validado",
+            f"El cliente valido el avance #{next_count}.",
+        )
+        message = "Avance validado correctamente."
+
+    elif action == "feedback_advance":
+        feedback_message = (data.get("message") or "").strip()
+        if not feedback_message:
+            return api_response(False, "Escribe la retroalimentacion del avance."), 400
+        feedback_id = execute_write(
+            """
+            INSERT INTO feedback_requests (project_id, stage_key, target_type, message, requested_by_user_id)
+            VALUES (%s, 'execution', 'advance', %s, %s)
+            """,
+            (project["id"], feedback_message, user["id"]),
+        )
+        add_project_history(project["id"], "Retroalimentacion de avance", feedback_message)
+        message = f"Retroalimentacion enviada. Ticket #{feedback_id}."
+
+    elif action == "request_final_meeting":
+        execute_write(
+            "UPDATE projects SET final_meeting_requested = 1 WHERE id = %s",
+            (project["id"],),
+        )
+        add_project_history(project["id"], "Reunion de entrega final solicitada", "El cliente solicito coordinar la reunion de entrega final.")
+        message = "Solicitud de entrega final registrada."
+
+    else:
+        return api_response(False, "Accion de proceso no soportada."), 400
+
+    updated_user = get_user_by_id(user["id"])
+    payload = dashboard_payload_for_client(updated_user)
+    return api_response(True, message, **payload)
+
+
 @app.route("/api/meetings/capture", methods=["POST"])
 def capture_meeting():
     require_database()
@@ -3458,7 +4056,7 @@ def admin_create_project(user):
             slug, client_user_id, title, service_type, status, admin_status, summary,
             budget, progress_percent, start_date, due_date
         )
-        VALUES (%s, %s, %s, %s, 'in_progress', 'backlog', %s, %s, 0, %s, %s)
+        VALUES (%s, %s, %s, %s, 'in_progress', 'backlog', %s, %s, 7, %s, %s)
         """,
         (
             slug,
@@ -3513,6 +4111,105 @@ def admin_update_project(user, project_id):
         (project_id,),
     )
     return api_response(True, "Proyecto actualizado.", project=project)
+
+
+@app.route("/api/admin/project-documents", methods=["POST"])
+@require_auth(("admin", "sales"))
+def admin_create_project_document(user):
+    require_database()
+    data = request.get_json(force=True) or {}
+    try:
+        project_id = int(data.get("project_id") or 0)
+    except (TypeError, ValueError):
+        project_id = 0
+
+    stage_key = (data.get("stage_key") or "").strip()
+    document_type = (data.get("document_type") or "note").strip() or "note"
+    title = (data.get("title") or "").strip()
+    note = (data.get("note") or "").strip()
+    resource_url = (data.get("resource_url") or "").strip()
+    file_name = (data.get("file_name") or "").strip()
+    is_visible = 1 if data.get("is_visible_to_client", True) not in (False, "false", "0", 0) else 0
+
+    if not project_id:
+        return api_response(False, "Selecciona un proyecto."), 400
+    if stage_key not in PROCESS_STAGE_ORDER:
+        return api_response(False, "Selecciona una etapa valida."), 400
+    if not title:
+        return api_response(False, "Ingresa un titulo para el documento o nota."), 400
+    if not note and not resource_url and not file_name:
+        return api_response(False, "Agrega una nota, enlace o nombre de archivo."), 400
+
+    project = fetch_one("SELECT id, title FROM projects WHERE id = %s", (project_id,))
+    if not project:
+        return api_response(False, "No encontramos el proyecto seleccionado."), 404
+
+    document_id = execute_write(
+        """
+        INSERT INTO project_documents (
+            project_id,
+            stage_key,
+            document_type,
+            title,
+            note,
+            resource_url,
+            file_name,
+            status,
+            is_visible_to_client,
+            created_by_user_id
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 'published', %s, %s)
+        """,
+        (project_id, stage_key, document_type, title, note, resource_url, file_name, is_visible, user["id"]),
+    )
+    add_project_history(
+        project_id,
+        f"Documento publicado: {title}",
+        f"{process_stage_label(stage_key)} - {note or resource_url or file_name}",
+    )
+
+    document = fetch_one(
+        """
+        SELECT id, project_id, stage_key, document_type, title, note, resource_url, file_name,
+               status, is_visible_to_client, created_at, updated_at
+        FROM project_documents
+        WHERE id = %s
+        """,
+        (document_id,),
+    )
+    return api_response(True, "Documento publicado correctamente.", document=document)
+
+
+@app.route("/api/admin/feedback-requests/<int:feedback_id>", methods=["PATCH"])
+@require_auth(("admin", "sales"))
+def admin_update_feedback_request(user, feedback_id):
+    require_database()
+    data = request.get_json(force=True) or {}
+    status = (data.get("status") or "").strip()
+    if status not in {"pending", "in_review", "resolved"}:
+        return api_response(False, "Estado de retroalimentacion no valido."), 400
+
+    feedback = fetch_one(
+        """
+        SELECT id, project_id, stage_key, message, status
+        FROM feedback_requests
+        WHERE id = %s
+        """,
+        (feedback_id,),
+    )
+    if not feedback:
+        return api_response(False, "No encontramos la solicitud de retroalimentacion."), 404
+
+    execute_write(
+        "UPDATE feedback_requests SET status = %s WHERE id = %s",
+        (status, feedback_id),
+    )
+    add_project_history(
+        feedback["project_id"],
+        "Retroalimentacion actualizada",
+        f"{process_stage_label(feedback['stage_key'])} paso a estado {status}.",
+    )
+    return api_response(True, "Retroalimentacion actualizada.", feedbackId=feedback_id, status=status)
 
 
 @app.route("/api/admin/tasks", methods=["POST"])

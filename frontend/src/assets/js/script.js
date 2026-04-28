@@ -1750,6 +1750,7 @@ function renderClientDashboard() {
   const data = state.clientDashboard;
   const project = data.project;
   const metrics = data.metrics;
+  data.history = data.timeline || data.history || [];
   const editableProfilePhone = extractLocalPhone(data.profile.phone);
 
   dom.clientTabs.overview.innerHTML = `
@@ -1783,7 +1784,8 @@ function renderClientDashboard() {
       </div>
     </div>
 
-    <div class="progress-section">
+    ${renderClientProcessFlow(data.processFlow)}
+    <div class="progress-section legacy-milestones hidden">
       <div class="progress-head">
         <h3 style="font-size:1rem;font-weight:700">Hitos del Proyecto</h3>
         <button class="btn btn-ghost" type="button" onclick="setClientTab('schedule')">Agendar revisión</button>
@@ -1810,6 +1812,8 @@ function renderClientDashboard() {
         <div class="wizard-title">Tipos de reunión</div>
         <div class="wizard-sub">Cada botón abre el calendario correspondiente desde la configuración del sistema.</div>
         <div class="action-column">
+          <button class="btn btn-primary" type="button" onclick="openScheduleModal('client-kickoff')">Kickoff inicial</button>
+          <button class="btn btn-outline" type="button" onclick="openScheduleModal('client-proposal')">Revision de propuesta</button>
           <button class="btn btn-primary" type="button" onclick="openScheduleModal('client-review')">Revisión de avances</button>
           <button class="btn btn-outline" type="button" onclick="openScheduleModal('client-close')">Reunión de cierre</button>
         </div>
@@ -1923,6 +1927,8 @@ function renderClientDashboard() {
     </div>
   `;
 
+  dom.clientTabs.wizard.insertAdjacentHTML('beforeend', renderClientEvaluationPanel(data));
+
   const clientWizardTitle = dom.clientTabs.wizard.querySelector('.panel-title');
   if (clientWizardTitle) {
     clientWizardTitle.textContent = 'Diagnostico';
@@ -1939,6 +1945,8 @@ function renderAdminOverview() {
   const clients = data.clients || [];
   const teamMembers = data.teamMembers || [];
   const taskMetrics = data.taskMetrics || { summary: {}, team: [], topMember: null };
+  const feedbackRequests = data.feedbackRequests || [];
+  const projectDocuments = data.projectDocuments || [];
   const isAdminPanel = isAdminRole(state.session?.role);
 
   dom.adminTabs.dashboard.innerHTML = `
@@ -1974,6 +1982,8 @@ function renderAdminOverview() {
       ${renderAutomationOverviewCard(data.leads, data.meetings)}
       ${renderBusinessOpsCard(data)}
     </div>
+
+    ${renderFeedbackRequestsPanel(feedbackRequests)}
 
     <div class="chart-area">
       <div class="section-row">
@@ -2081,6 +2091,8 @@ function renderAdminOverview() {
     </form>
 
     ${renderProjectBoard(data.projects)}
+
+    ${renderProjectDocumentAdminPanel(data.projects, projectDocuments)}
 
     <div class="section-row" style="margin-top:28px">
       <div>
@@ -2371,6 +2383,107 @@ function renderMilestone(milestone) {
   `;
 }
 
+function renderClientProcessFlow(processFlow) {
+  const flow = processFlow || { overallProgress: 0, stages: [] };
+  const stages = flow.stages || [];
+  if (!stages.length) {
+    return '';
+  }
+
+  return `
+    <div class="process-flow-card">
+      <div class="progress-head process-flow-head">
+        <div>
+          <span class="section-label">Ruta funcional TISNET</span>
+          <h3>Progreso del proyecto por etapas</h3>
+          <p>Los porcentajes cambian cuando el cliente, ventas o administracion realizan acciones reales.</p>
+        </div>
+        <div class="process-overall">
+          <strong>${flow.overallProgress || 0}%</strong>
+          <span>avance total</span>
+        </div>
+      </div>
+      <div class="process-stage-grid">
+        ${stages.map(renderProcessStage).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderProcessStage(stage) {
+  const actions = stage.actions || [];
+  const docs = stage.documents || [];
+  const feedbacks = stage.feedbacks || [];
+  return `
+    <article class="process-stage process-stage-${escapeAttribute(stage.status || 'pending')}">
+      <div class="process-stage-top">
+        <div>
+          <span class="process-stage-kicker">${escapeHtml(stage.title)}</span>
+          <strong>${stage.percent || 0}%</strong>
+        </div>
+        <span class="badge ${stage.status === 'done' ? 'badge-done' : stage.status === 'in_progress' ? 'badge-active' : 'badge-pending'}">
+          ${stage.status === 'done' ? 'Completado' : stage.status === 'in_progress' ? 'En proceso' : 'Pendiente'}
+        </span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill ${stage.status === 'done' ? 'done' : ''}" style="width:${stage.percent || 0}%"></div>
+      </div>
+      <p>${escapeHtml(stage.message || stage.copy || '')}</p>
+      ${docs.length ? `<div class="process-doc-list">${docs.map(renderProcessDocumentChip).join('')}</div>` : ''}
+      ${feedbacks.length ? `<div class="process-feedback-note">${feedbacks.length} retroalimentacion pendiente en esta etapa.</div>` : ''}
+      ${actions.length ? `<div class="process-actions">${actions.map(renderProcessActionButton).join('')}</div>` : ''}
+    </article>
+  `;
+}
+
+function renderProcessDocumentChip(document) {
+  const label = document.resource_url ? 'Abrir' : 'Publicado';
+  return `
+    <button class="process-doc-chip" type="button" onclick="${document.resource_url ? `window.open('${escapeAttribute(document.resource_url)}', '_blank')` : `toast('Documento registrado sin enlace publico.', 'info')`}">
+      <span>${escapeHtml(document.title || 'Documento')}</span>
+      <small>${escapeHtml(label)}</small>
+    </button>
+  `;
+}
+
+function renderProcessActionButton(action) {
+  const styleClass = action.style === 'accent' ? 'btn-accent' : action.style === 'primary' ? 'btn-primary' : 'btn-ghost';
+  return `
+    <button class="btn ${styleClass}" type="button" onclick="handleClientProcessAction('${escapeAttribute(action.type)}', '${escapeAttribute(action.context || '')}', '${escapeAttribute(action.url || '')}')">
+      ${escapeHtml(action.label)}
+    </button>
+  `;
+}
+
+function renderClientEvaluationPanel(data) {
+  const diagnosticStage = (data.processFlow?.stages || []).find((stage) => stage.key === 'diagnostic');
+  const evaluation = diagnosticStage?.documents?.[0];
+  return `
+    <div class="table-card client-evaluation-card">
+      <div class="section-row">
+        <div>
+          <h3 class="table-title">Evaluacion del proyecto</h3>
+          <p class="panel-sub">Aqui aparecera la lectura del equipo TISNET despues de revisar tu diagnostico.</p>
+        </div>
+        <span class="badge ${evaluation ? 'badge-active' : 'badge-pending'}">${evaluation ? 'Publicado' : 'Pendiente'}</span>
+      </div>
+      ${
+        evaluation
+          ? `
+            <div class="summary-block"><strong>${escapeHtml(evaluation.title)}</strong></div>
+            <div class="summary-block">${escapeHtml(evaluation.note || 'Evaluacion publicada para revision.')}</div>
+            <div class="action-row">
+              ${evaluation.resource_url ? `<button class="btn btn-primary" type="button" onclick="window.open('${escapeAttribute(evaluation.resource_url)}', '_blank')">Ver evaluacion</button>` : ''}
+              <button class="btn btn-accent" type="button" onclick="handleClientProcessAction('validate_diagnostic')">Validar</button>
+              <button class="btn btn-ghost" type="button" onclick="handleClientProcessAction('feedback_diagnostic')">Retroalimentar</button>
+            </div>
+          `
+          : renderEmptyState('Todavia no hay evaluacion publicada por el equipo.')
+      }
+    </div>
+  `;
+}
+
 function renderMessage(message) {
   return `
     <div class="message-item">
@@ -2390,6 +2503,7 @@ function renderHistoryRow(item) {
       <div>
         <strong>${escapeHtml(item.title)}</strong>
         <p>${escapeHtml(item.detail || '')}</p>
+        ${item.url ? `<button class="btn btn-ghost btn-mini" type="button" onclick="window.open('${escapeAttribute(item.url)}', '_blank')">Abrir recurso</button>` : ''}
       </div>
       <span>${formatDate(item.created_at)}</span>
     </div>
@@ -2602,6 +2716,126 @@ function renderBusinessOpsCard(data) {
           <span>${data.meetings.length} reuniones</span>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function renderFeedbackRequestsPanel(requests) {
+  const list = requests || [];
+  const pending = list.filter((item) => item.status !== 'resolved');
+  return `
+    <div class="table-card feedback-ops-panel">
+      <div class="section-row">
+        <div>
+          <h3 class="table-title">Retroalimentacion y reuniones pendientes</h3>
+          <p class="panel-sub">Ventas y administracion ven aqui los bloqueos que el cliente envia desde diagnostico, propuesta o avances.</p>
+        </div>
+        <span class="badge ${pending.length ? 'badge-active' : 'badge-done'}">${pending.length} pendiente${pending.length === 1 ? '' : 's'}</span>
+      </div>
+      ${
+        list.length
+          ? `<div class="feedback-request-list">${list.slice(0, 6).map(renderFeedbackRequestRow).join('')}</div>`
+          : renderEmptyState('No hay solicitudes de retroalimentacion por ahora.')
+      }
+    </div>
+  `;
+}
+
+function renderFeedbackRequestRow(request) {
+  return `
+    <article class="feedback-request-row">
+      <div>
+        <strong>${escapeHtml(request.client_company || request.client_name || 'Cliente')}</strong>
+        <p>${escapeHtml(processStageLabel(request.stage_key))} - ${escapeHtml(request.message || '')}</p>
+        <span>${escapeHtml(request.project_title || 'Proyecto')} - ${formatDateTime(request.created_at)}</span>
+      </div>
+      <div class="feedback-request-actions">
+        <span class="badge ${request.status === 'resolved' ? 'badge-done' : request.status === 'in_review' ? 'badge-active' : 'badge-pending'}">${escapeHtml(feedbackStatusLabel(request.status))}</span>
+        ${request.status !== 'in_review' ? `<button class="btn btn-ghost" type="button" onclick="updateFeedbackRequestStatus(${request.id}, 'in_review')">Revisar</button>` : ''}
+        ${request.status !== 'resolved' ? `<button class="btn btn-primary" type="button" onclick="updateFeedbackRequestStatus(${request.id}, 'resolved')">Resolver</button>` : ''}
+      </div>
+    </article>
+  `;
+}
+
+function renderProjectDocumentAdminPanel(projects, documents) {
+  return `
+    <div class="section-row" style="margin-top:28px">
+      <div>
+        <h3 class="table-title">Documentos, propuestas y avances</h3>
+        <p class="panel-sub">Publica evaluaciones, propuestas tecnicas comerciales, avances o entregables visibles en el historial del cliente.</p>
+      </div>
+    </div>
+    <form class="wizard-card mini-form" id="admin-document-form">
+      <div class="newsletter-grid">
+        <div class="form-group">
+          <label class="form-label" for="admin-document-project">Proyecto</label>
+          <select class="form-input form-select" id="admin-document-project" name="project_id">
+            ${(projects || []).map((project) => `<option value="${project.id}">${escapeHtml(project.title)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-document-stage">Etapa</label>
+          <select class="form-input form-select" id="admin-document-stage" name="stage_key">
+            <option value="diagnostic">Diagnostico</option>
+            <option value="proposal">Propuesta tecnica comercial</option>
+            <option value="execution">Ejecucion del proyecto</option>
+            <option value="delivery">Entrega final</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-document-type">Tipo</label>
+          <select class="form-input form-select" id="admin-document-type" name="document_type">
+            <option value="evaluation">Evaluacion</option>
+            <option value="proposal">Propuesta</option>
+            <option value="advance">Avance</option>
+            <option value="delivery">Entregable final</option>
+            <option value="note">Nota</option>
+            <option value="link">Link</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-document-title">Titulo</label>
+          <input class="form-input" id="admin-document-title" name="title" type="text" placeholder="Ej. Evaluacion inicial del proyecto" required>
+        </div>
+      </div>
+      <div class="newsletter-grid">
+        <div class="form-group">
+          <label class="form-label" for="admin-document-url">Enlace publico</label>
+          <input class="form-input" id="admin-document-url" name="resource_url" type="url" placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin-document-file">Nombre de archivo</label>
+          <input class="form-input" id="admin-document-file" name="file_name" type="text" placeholder="propuesta.pdf">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="admin-document-note">Nota visible</label>
+        <textarea class="textarea-input" id="admin-document-note" name="note" placeholder="Describe que debe revisar o validar el cliente"></textarea>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" name="is_visible_to_client" checked>
+        <span>Visible para el cliente en su historial</span>
+      </label>
+      <div class="action-row">
+        <button class="btn btn-primary" type="submit">Publicar documento</button>
+      </div>
+      <p class="inline-note" id="admin-document-feedback">Acepta enlaces a PDF, Word, PPT, Canva, Drive o notas internas visibles.</p>
+    </form>
+    <div class="table-card compact-table-card">
+      ${(documents || []).length ? (documents || []).slice(0, 8).map(renderAdminDocumentRow).join('') : renderEmptyState('Todavia no hay documentos publicados.')}
+    </div>
+  `;
+}
+
+function renderAdminDocumentRow(document) {
+  return `
+    <div class="history-row">
+      <div>
+        <strong>${escapeHtml(document.title)}</strong>
+        <p>${escapeHtml(processStageLabel(document.stage_key))} - ${escapeHtml(document.project_title || 'Proyecto')}</p>
+      </div>
+      <span>${formatDate(document.created_at)}</span>
     </div>
   `;
 }
@@ -3616,6 +3850,20 @@ async function updateAdminTaskStatus(taskId, status) {
   }
 }
 
+async function updateFeedbackRequestStatus(feedbackId, status) {
+  try {
+    await api(`/api/admin/feedback-requests/${feedbackId}`, {
+      method: 'PATCH',
+      body: { status },
+    });
+    toast('Retroalimentacion actualizada.', 'success');
+    await loadAdminOverview();
+    setAdminTab('dashboard');
+  } catch (error) {
+    toast(error.message, 'error');
+  }
+}
+
 async function convertLeadToProject(leadId) {
   const lead = state.adminOverview?.leads?.find((item) => String(item.id) === String(leadId));
   if (!lead) {
@@ -3825,6 +4073,74 @@ async function handleDiagnosticSubmit(event) {
   }
 }
 
+async function handleClientProcessAction(action, context = '', url = '') {
+  if (action === 'schedule') {
+    openScheduleModal(context || 'client-review');
+    return;
+  }
+  if (action === 'open_document') {
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      toast('El documento esta publicado sin enlace externo.', 'info');
+    }
+    return;
+  }
+  if (action === 'go_diagnostic') {
+    showView('wizard-view');
+    return;
+  }
+  if (action === 'go_history') {
+    setClientTab('history');
+    return;
+  }
+
+  const payload = { action };
+  if (action === 'confirm_kickoff') {
+    payload.confirmed = window.confirm('¿Ya realizaste tu reunion de kickoff?');
+    if (!payload.confirmed) {
+      toast('Kickoff se mantiene pendiente hasta confirmar la reunion.', 'info');
+      return;
+    }
+  }
+  if (['feedback_diagnostic', 'feedback_proposal', 'feedback_advance'].includes(action)) {
+    const message = window.prompt('Escribe la retroalimentacion para el equipo TISNET:');
+    if (!message || !message.trim()) {
+      toast('La retroalimentacion no se envio porque estaba vacia.', 'warning');
+      return;
+    }
+    payload.message = message.trim();
+  }
+  if (action === 'validate_proposal') {
+    const percent = window.prompt('Porcentaje de anticipo acordado: 10, 20 o 30', '20');
+    payload.advance_payment_percent = Number(percent || 20);
+  }
+  if (action === 'validate_advance') {
+    const approved = window.confirm('¿Deseas validar este avance? Esto aumentara el porcentaje de ejecucion.');
+    if (!approved) {
+      return;
+    }
+  }
+  if (action === 'request_final_meeting') {
+    const approved = window.confirm('Registraremos la solicitud de reunion de entrega final. ¿Continuar?');
+    if (!approved) {
+      return;
+    }
+  }
+
+  try {
+    const response = await api('/api/client/process/action', {
+      method: 'POST',
+      body: payload,
+    });
+    state.clientDashboard = response;
+    renderClientDashboard();
+    toast(response.message || 'Proceso actualizado.', 'success');
+  } catch (error) {
+    toast(error.message, 'error');
+  }
+}
+
 async function handleDynamicSubmit(event) {
   const form = event.target;
 
@@ -3893,6 +4209,35 @@ async function handleDynamicSubmit(event) {
       setAdminTab('projects');
     } catch (error) {
       setFeedback(document.getElementById('admin-project-feedback'), error.message, 'error');
+      toast(error.message, 'error');
+    }
+  }
+
+  if (form.id === 'admin-document-form') {
+    event.preventDefault();
+    if (!isOperatorRole(state.session?.role)) {
+      toast('Solo administracion o ventas pueden publicar documentos.', 'warning');
+      return;
+    }
+    const payload = Object.fromEntries(new FormData(form).entries());
+    payload.is_visible_to_client = form.querySelector('[name="is_visible_to_client"]')?.checked ?? true;
+
+    try {
+      await api('/api/admin/project-documents', {
+        method: 'POST',
+        body: payload,
+      });
+      form.reset();
+      const visibleToggle = form.querySelector('[name="is_visible_to_client"]');
+      if (visibleToggle) {
+        visibleToggle.checked = true;
+      }
+      setFeedback(document.getElementById('admin-document-feedback'), 'Documento publicado y visible en el historial del cliente.', 'success');
+      toast('Documento publicado.', 'success');
+      await loadAdminOverview();
+      setAdminTab('projects');
+    } catch (error) {
+      setFeedback(document.getElementById('admin-document-feedback'), error.message, 'error');
       toast(error.message, 'error');
     }
   }
@@ -4250,6 +4595,22 @@ function resolveScheduleContext(context) {
       description: 'Reserva una reunion inicial sin salir del sitio.',
       meetingType: 'Reunion inicial',
       url: settings.public_calendly_url,
+    },
+    'client-kickoff': {
+      key: 'client-kickoff',
+      label: 'Kickoff',
+      title: 'Agenda tu reunion de kickoff',
+      description: 'Esta reunion activa el arranque formal del proyecto y desbloquea el diagnostico.',
+      meetingType: 'Kickoff inicial',
+      url: settings.client_review_calendly_url || settings.public_calendly_url,
+    },
+    'client-proposal': {
+      key: 'client-proposal',
+      label: 'Revision de propuesta',
+      title: 'Agenda revision de propuesta tecnica comercial',
+      description: 'Resuelve dudas antes de validar la propuesta y pasar a ejecucion.',
+      meetingType: 'Revision de propuesta',
+      url: settings.client_review_calendly_url || settings.public_calendly_url,
     },
     'client-review': {
       key: 'client-review',
@@ -5056,6 +5417,26 @@ function taskStatusLabel(status) {
   return labels[status] || capitalize(status.replaceAll('_', ' '));
 }
 
+function processStageLabel(stageKey) {
+  const labels = {
+    kickoff: 'Kickoff',
+    diagnostic: 'Diagnostico',
+    proposal: 'Propuesta tecnica comercial',
+    execution: 'Ejecucion del proyecto',
+    delivery: 'Entrega final',
+  };
+  return labels[stageKey] || capitalize(String(stageKey || '').replaceAll('_', ' '));
+}
+
+function feedbackStatusLabel(status) {
+  const labels = {
+    pending: 'Pendiente',
+    in_review: 'En revision',
+    resolved: 'Resuelta',
+  };
+  return labels[status] || capitalize(String(status || '').replaceAll('_', ' '));
+}
+
 function badgeClassForLead(status) {
   const classes = {
     new: 'badge-new',
@@ -5226,6 +5607,8 @@ window.closeAdminClientDetail = closeAdminClientDetail;
 window.convertLeadToProject = convertLeadToProject;
 window.updateAdminTaskAssignee = updateAdminTaskAssignee;
 window.updateAdminTaskStatus = updateAdminTaskStatus;
+window.updateFeedbackRequestStatus = updateFeedbackRequestStatus;
+window.handleClientProcessAction = handleClientProcessAction;
 window.openQuoteModuleDetail = openQuoteModuleDetail;
 window.openQuoteFeatureDetail = openQuoteFeatureDetail;
 window.closeQuoteDetailModal = closeQuoteDetailModal;

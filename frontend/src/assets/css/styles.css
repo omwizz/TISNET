@@ -3433,7 +3433,6 @@
     font-size: 1.75rem;
   }
 
-  .portfolio-memory-hint,
   .portfolio-memory-see {
     align-self: flex-start;
     display: inline-flex;
@@ -5225,5 +5224,226 @@
 
   .case-modal {
     max-width: calc(100vw - 18px);
+  }
+}
+
+.process-flow-card,
+.client-evaluation-card,
+.feedback-ops-panel {
+  border: 1px solid rgba(0, 212, 255, .14);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(0, 212, 255, .12), transparent 32%),
+    linear-gradient(135deg, rgba(17, 25, 42, .96), rgba(13, 18, 31, .98));
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .28);
+}
+
+.process-flow-card {
+  padding: 22px;
+  border-radius: 24px;
+  margin: 20px 0;
+}
+
+.process-flow-head {
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.process-flow-head h3 {
+  margin: 6px 0;
+  font-size: 1.1rem;
+}
+
+.process-flow-head p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .9rem;
+}
+
+.process-overall {
+  min-width: 112px;
+  padding: 14px;
+  border-radius: 18px;
+  text-align: center;
+  background: rgba(0, 212, 255, .08);
+  border: 1px solid rgba(0, 212, 255, .18);
+}
+
+.process-overall strong {
+  display: block;
+  color: var(--accent);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.process-overall span,
+.process-stage-kicker {
+  color: var(--text-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.process-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.process-stage {
+  display: flex;
+  min-height: 245px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.process-stage-done {
+  border-color: rgba(34, 197, 94, .32);
+  background: rgba(34, 197, 94, .07);
+}
+
+.process-stage-in_progress {
+  border-color: rgba(0, 212, 255, .28);
+}
+
+.process-stage-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.process-stage-top strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-main);
+  font-size: 1.35rem;
+}
+
+.process-stage p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .82rem;
+  line-height: 1.55;
+}
+
+.process-doc-list,
+.process-actions,
+.feedback-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.process-actions {
+  margin-top: auto;
+}
+
+.process-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 212, 255, .18);
+  color: var(--accent);
+  background: rgba(0, 212, 255, .08);
+  cursor: pointer;
+}
+
+.process-doc-chip span {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-doc-chip small {
+  color: rgba(255, 255, 255, .66);
+}
+
+.process-feedback-note {
+  padding: 8px 10px;
+  border-radius: 14px;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, .08);
+  border: 1px solid rgba(251, 191, 36, .18);
+  font-size: .78rem;
+}
+
+.feedback-request-list {
+  display: grid;
+  gap: 12px;
+}
+
+.feedback-request-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .035);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.feedback-request-row p {
+  margin: 5px 0;
+  color: var(--text-muted);
+}
+
+.feedback-request-row span {
+  color: var(--text-muted);
+  font-size: .78rem;
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: .86rem;
+}
+
+.btn-mini {
+  margin-top: 8px;
+  padding: 7px 10px;
+  font-size: .72rem;
+}
+
+.compact-table-card {
+  margin-top: 14px;
+}
+
+@media (max-width: 1180px) {
+  .process-stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .process-flow-card {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .process-flow-head,
+  .feedback-request-row {
+    flex-direction: column;
+  }
+
+  .process-overall {
+    width: 100%;
+  }
+
+  .process-stage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .process-stage {
+    min-height: 0;
   }
 }
